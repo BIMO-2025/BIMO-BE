@@ -189,7 +189,7 @@ cython_debug/
 # .vscode/
 
 #Firebase-adminsdk-fbsvc
-bimo-725a5-firebase-adminsdk-fbsvc-fe3d5df29b.json
+firebase_service_key.json
 
 # Ruff stuff:
 .ruff_cache/
