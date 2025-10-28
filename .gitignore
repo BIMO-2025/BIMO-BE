@@ -169,11 +169,10 @@ dmypy.json
 cython_debug/
 
 # PyCharm
-#  JetBrains specific template is maintained in a separate JetBrains.gitignore that can
-#  be found at https://github.com/github/gitignore/blob/main/Global/JetBrains.gitignore
-#  and can be added to the global gitignore or merged into this file.  For a more nuclear
-#  option (not recommended) you can uncomment the following to ignore the entire idea folder.
-#.idea/
+# 개별 IDE 설정 파일임. 개개인마다 차이가 무조건 발생.
+# git에 commit하고 push 할 때마다 무조건 불필요한 커밋 발생할 것!
+# 그래서 .idea 디렉토리와 하위 파일들도 gitignore에 추가해줬습니다.
+.idea/
 
 # Abstra
 # Abstra is an AI-powered process automation framework.
@@ -208,3 +207,9 @@ firebase_service_key.json
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# firebase 관리자 json file
+bimo-be-firebase-adminsdk.json
+
+# 인호 맥북 시스템 파일인 DS_Store 무시
+.DS_store
