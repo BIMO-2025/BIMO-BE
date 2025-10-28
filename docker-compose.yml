@@ -1,0 +1,17 @@
+version: '3.8' # Docker Compose 버전
+
+services:
+  db:
+    image: postgres:16 # PostgreSQL 16 버전 이미지를 사용 (최신 안정 버전)
+    container_name: bimo_postgres_db
+    environment:
+      POSTGRES_USER: bimo_user       # DB 접속 유저명 (원하는 대로 변경)
+      POSTGRES_PASSWORD: bimo_pass   # DB 접속 비밀번호 (원하는 대로 변경)
+      POSTGRES_DB: bimo_db         # 생성할 데이터베이스 이름 (원하는 대로 변경)
+    ports:
+      - "5432:5432" # 내 Mac의 5432 포트와 컨테이너의 5432 포트를 연결
+    volumes:
+      - postgres_data:/var/lib/postgresql/data # DB 데이터를 Mac에 저장 (컨테이너 삭제돼도 유지)
+
+volumes:
+  postgres_data: # 위에서 사용한 볼륨 정의
