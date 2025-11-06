@@ -10,11 +10,8 @@ from app.core.config import (
     API_TOKEN_EXPIRE_MINUTES
 )
 # AppConfigError (시작 오류) 및 런타임 예외 임포트
-from app.core.exceptions.exception_handlers import (
-    AppConfigError,
-)
-
 from app.core.exceptions.exceptions import (
+    AppConfigError,
     InvalidTokenError,
     TokenExpiredError,
 )
