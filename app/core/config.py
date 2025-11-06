@@ -8,4 +8,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # .env 파일에 정의된 환경 변수를 읽어옵니다.
+# 1. Firebase Key
 FIREBASE_KEY_PATH = os.getenv("FIREBASE_SERVICE_ACCOUNT_KEY")
+# 2. Postgresql URL
+DATABASE_URL = os.getenv("DATABASE_URL")

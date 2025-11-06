@@ -1,6 +1,7 @@
 # app/main.py
 
 from fastapi import FastAPI
+from app.db.models import Test
 
 # 1. 기능별 라우터 import
 
