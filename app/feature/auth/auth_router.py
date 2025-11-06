@@ -17,32 +17,24 @@ async def login_with_google(
     클라이언트에서 받은 Google ID Token을 검증하고,
     사용자를 확인/생성한 뒤,
     우리 서비스의 API Access Token을 발급합니다.
+
+    이 엔드포인트는 서비스 계층(auth_service)에서 발생하는
+    모든 CustomException을 자동으로 main.py의
+    exception_handler가 처리하도록 위임합니다.
     """
-    try:
-        # 1. Google ID Token 검증
-        decoded_token = await auth_service.verify_google_id_token(request.token)
 
-        # 2. 사용자 조회 또는 생성
-        user = await auth_service.get_or_create_user(decoded_token)
+    # 1. Google ID Token 검증
+    decoded_token = await auth_service.verify_google_id_token(request.token)
 
-        # 3. 우리 서비스 전용 API 토큰 생성
-        api_access_token = auth_service.generate_api_token(uid=user.uid)
+    # 2. 사용자 조회 또는 생성
+    user = await auth_service.get_or_create_user(decoded_token)
 
-        return {
-            "access_token": api_access_token,
-            "token_type": "bearer"
-        }
+    # 3. 우리 서비스 전용 API 토큰 생성
+    # (generate_api_token은 동기 함수이지만, I/O가 없는 CPU 작업이므로
+    # run_in_threadpool이 필요하지 않습니다.)
+    api_access_token = auth_service.generate_api_token(uid=user.uid)
 
-    except HTTPException as e:
-        # 서비스 로직에서 발생한 HTTPException을 그대로 반환
-        raise e
-    except Exception as e:
-        # 그 외 예외 처리
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"로그인 처리 중 알 수 없는 오류 발생: {e}"
-        )
-
-# 참고: Kakao, Apple 로그인 라우터도 비슷한 구조로 추가할 수 있습니다.
-# 예: @router.post("/kakao/login")
-# Apple 로그인은 검증 방식이 조금 더 복잡할 수 있습니다. (Firebase 사용 시 유사)
+    return {
+        "access_token": api_access_token,
+        "token_type": "bearer"
+    }
