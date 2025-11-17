@@ -3,6 +3,7 @@
 from fastapi import FastAPI
 
 # 1. 기능별 라우터 import
+from app.feature.LLM import llm_router
 from app.feature.auth import auth_router
 
 # 2. Firebase 초기화 실행
@@ -30,8 +31,8 @@ def read_root():
     return {"Hello": "Welcome to BIMO-BE API"}
 
 
-
 # 5. 기능별 라우터 등록
 app.include_router(auth_router.router)
+app.include_router(llm_router.router)
 
 # ... (다른 라우터들도 여기에 추가)
