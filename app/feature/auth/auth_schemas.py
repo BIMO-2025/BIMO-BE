@@ -1,19 +1,4 @@
-from pydantic import BaseModel, EmailStr
-from typing import Optional
-
-# --- 기본 모델 ---
-
-class UserBase(BaseModel):
-    """Firestore에 저장될 사용자 기본 정보"""
-    uid: str
-    email: Optional[EmailStr] = None
-    display_name: Optional[str] = None
-    photo_url: Optional[str] = None
-    provider_id: str # 예: "google.com", "apple.com"
-
-class UserInDB(UserBase):
-    created_at: str
-    last_login_at: str
+from pydantic import BaseModel, ConfigDict
 
 # --- 요청 스키마 ---
 
@@ -24,9 +9,14 @@ class SocialLoginRequest(BaseModel):
     """
     token: str
 
+    model_config = ConfigDict(from_attributes=True)
+
+
 # --- 응답 스키마 ---
 
 class TokenResponse(BaseModel):
     """클라이언트에게 반환할 API Access Token"""
     access_token: str
     token_type: str = "bearer"
+
+    model_config = ConfigDict(from_attributes=True)
