@@ -34,7 +34,6 @@ def read_root():
     return {"Hello": "Welcome to BIMO-BE API"}
 
 
-
 # 5. 기능별 라우터 등록
 app.include_router(auth_router.router)
 app.include_router(llm_router.router)

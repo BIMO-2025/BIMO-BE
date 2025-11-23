@@ -19,7 +19,9 @@ def build_prompt_segments(
     flight_info: Optional[FlightInfo],
     images: Optional[List[ImageAttachment]],
 ) -> List[object]:
-    """Gemini SDK generate_content 호출 시 사용할 입력 시퀀스를 구성한다."""
+    """
+    Gemini SDK generate_content 호출 시 사용할 프롬프트 목록을 구성합니다.
+    """
     segments: List[object] = []
     if context:
         segments.extend([ctx for ctx in context if ctx.strip()])
@@ -37,6 +39,9 @@ def build_prompt_segments(
 
 
 def _build_image_parts(images: List[ImageAttachment]) -> List[object]:
+    """
+    Gemini 멀티모달 입력에 사용할 이미지 Part를 생성합니다.
+    """
     parts: List[object] = []
     for image in images:
         mime_type = image.mime_type or "image/png"
@@ -60,6 +65,9 @@ def _build_image_parts(images: List[ImageAttachment]) -> List[object]:
 
 
 def _format_flight_info(flight: FlightInfo) -> str:
+    """
+    FlightInfo 객체를 모델이 이해하기 쉬운 요약 문자열로 변환합니다.
+    """
     fields = []
     if flight.airline:
         fields.append(f"Airline: {flight.airline}")
@@ -84,7 +92,3 @@ def _format_flight_info(flight: FlightInfo) -> str:
         return ""
 
     return "Flight context :: " + ", ".join(fields)
-
-
-
-

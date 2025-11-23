@@ -8,7 +8,9 @@ from app.core.exceptions.exceptions import AppConfigError, ExternalApiError
 
 
 class GeminiClient:
-    """google-generativeai SDK 초기화 및 호출을 담당하는 어댑터."""
+    """
+    google-generativeai SDK 초기화 및 요청 실행을 담당하는 어댑터.
+    """
 
     def __init__(
         self,
@@ -71,7 +73,3 @@ class GeminiClient:
 gemini_client = GeminiClient()
 
 __all__ = ["GeminiClient", "gemini_client"]
-
-
-
-

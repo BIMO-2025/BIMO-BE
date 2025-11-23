@@ -9,7 +9,9 @@ MODEL_NAME = gemini_client.model_name
 
 
 async def generate_chat_completion(request: LLMChatRequest) -> str:
-    """Gemini 모델에 프롬프트를 전달하고 응답 텍스트를 반환한다."""
+    """
+    Gemini 모델에 프롬프트를 전달하고 응답 텍스트를 반환합니다.
+    """
     system_instruction = request.system_instruction or DEFAULT_SYSTEM_INSTRUCTION
 
     prompt_segments = build_prompt_segments(
@@ -23,7 +25,4 @@ async def generate_chat_completion(request: LLMChatRequest) -> str:
         prompt_segments=prompt_segments,
         system_instruction=system_instruction,
     )
-
-
-
 
