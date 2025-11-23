@@ -24,3 +24,7 @@ except ValueError:
     raise AppConfigError(
         "환경 변수 'API_TOKEN_EXPIRE_MINUTES'는 정수여야 합니다. 예: 30"
     )
+
+# Gemini API 설정
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+GEMINI_MODEL_NAME = os.getenv("GEMINI_MODEL_NAME", "gemini-1.5-flash")
