@@ -71,6 +71,11 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000
 ### LLM
 - `POST /llm/chat` - Gemini 채팅
 
+### 알림 (Notifications)
+- `POST /notifications/send` - 사용자에게 푸시 알림 전송
+- `POST /notifications/token/update` - FCM 토큰 업데이트
+- `POST /notifications/token/remove` - FCM 토큰 제거
+
 ## 🛠️ 개발 환경 설정
 
 ### Python 버전
@@ -95,6 +100,26 @@ pip install -r requirements.txt
 ## 📖 문서
 
 - [인증 및 사용자 API 스키마](docs/API_AUTH_USER_SCHEMAS.md)
+- [테스트 가이드](README_TESTING.md)
+- [FCM 알림 가이드](docs/FCM_NOTIFICATION_GUIDE.md)
+
+## 🧪 테스트
+
+### 테스트 실행
+
+```bash
+# 모든 테스트 실행
+pytest
+
+# 커버리지 포함
+pytest --cov=app --cov-report=html
+
+# 특정 테스트만
+pytest tests/unit/
+pytest tests/integration/
+```
+
+자세한 내용은 [테스트 가이드](README_TESTING.md)를 참고하세요.
 
 ## 🔧 문제 해결
 

@@ -164,10 +164,11 @@ class KakaoAuthProvider(BaseAuthProvider):
             display_name=firebase_user.display_name,
             photo_url=firebase_user.photo_url,
             provider_id="kakao.com",
+            fcm_token=fcm_token,
         )
 
     @classmethod
-    async def authenticate(cls, token: str) -> dict:
+    async def authenticate(cls, token: str, fcm_token: str | None = None) -> dict:
         """
         [비동기 함수] Kakao 로그인 전체 프로세스를 처리합니다.
         
@@ -188,7 +189,7 @@ class KakaoAuthProvider(BaseAuthProvider):
         firebase_user = await cls.get_or_create_firebase_user(kakao_user_info)
 
         # 3. Firestore 사용자 조회 또는 생성
-        user = await cls.get_or_create_user(firebase_user)
+        user = await cls.get_or_create_user(firebase_user, fcm_token=fcm_token)
 
         # 4. API 토큰 생성
         api_access_token = cls.generate_api_token(uid=user.uid)

@@ -23,7 +23,7 @@ class GoogleAuthProvider(FirebaseAuthProvider):
         return await super().verify_token(token)
 
     @classmethod
-    async def get_or_create_user(cls, decoded_token: dict) -> UserInDB:
+    async def get_or_create_user(cls, decoded_token: dict, fcm_token: str | None = None) -> UserInDB:
         """
         [비동기 함수] Google 사용자 정보를 바탕으로 Firestore에서 사용자를 조회하거나 생성합니다.
         
@@ -33,10 +33,10 @@ class GoogleAuthProvider(FirebaseAuthProvider):
         Returns:
             Firestore에 저장된 사용자 정보 (UserInDB)
         """
-        return await super().get_or_create_user(decoded_token, provider_name="Google")
+        return await super().get_or_create_user(decoded_token, provider_name="Google", fcm_token=fcm_token)
 
     @classmethod
-    async def authenticate(cls, token: str) -> dict:
+    async def authenticate(cls, token: str, fcm_token: str | None = None) -> dict:
         """
         [비동기 함수] Google 로그인 전체 프로세스를 처리합니다.
         
@@ -54,7 +54,7 @@ class GoogleAuthProvider(FirebaseAuthProvider):
         decoded_token = await cls.verify_token(token)
 
         # 2. 사용자 조회 또는 생성
-        user = await cls.get_or_create_user(decoded_token)
+        user = await cls.get_or_create_user(decoded_token, fcm_token=fcm_token)
 
         # 3. API 토큰 생성
         api_access_token = cls.generate_api_token(uid=user.uid)

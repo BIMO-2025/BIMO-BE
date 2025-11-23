@@ -27,7 +27,7 @@ async def login_with_google(request: auth_schemas.SocialLoginRequest):
         - **access_token**: 우리 서비스 전용 JWT 토큰
         - **token_type**: "bearer"
     """
-    result = await auth_service.authenticate_with_google(request.token)
+    result = await auth_service.authenticate_with_google(request.token, fcm_token=request.fcm_token)
     return {
         "access_token": result["access_token"],
         "token_type": result["token_type"]
@@ -48,7 +48,7 @@ async def login_with_apple(request: auth_schemas.SocialLoginRequest):
         - **access_token**: 우리 서비스 전용 JWT 토큰
         - **token_type**: "bearer"
     """
-    result = await auth_service.authenticate_with_apple(request.token)
+    result = await auth_service.authenticate_with_apple(request.token, fcm_token=request.fcm_token)
     return {
         "access_token": result["access_token"],
         "token_type": result["token_type"]
@@ -69,7 +69,7 @@ async def login_with_kakao(request: auth_schemas.SocialLoginRequest):
         - **access_token**: 우리 서비스 전용 JWT 토큰
         - **token_type**: "bearer"
     """
-    result = await auth_service.authenticate_with_kakao(request.token)
+    result = await auth_service.authenticate_with_kakao(request.token, fcm_token=request.fcm_token)
     return {
         "access_token": result["access_token"],
         "token_type": result["token_type"]

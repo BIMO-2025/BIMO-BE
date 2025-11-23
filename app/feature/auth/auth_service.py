@@ -14,7 +14,7 @@ from app.feature.auth.providers import (
 # ============================================
 
 
-async def authenticate_with_google(token: str) -> dict:
+async def authenticate_with_google(token: str, fcm_token: str | None = None) -> dict:
     """
     Google 로그인을 처리합니다.
     
@@ -28,10 +28,10 @@ async def authenticate_with_google(token: str) -> dict:
             "user": UserInDB 객체
         }
     """
-    return await GoogleAuthProvider.authenticate(token)
+    return await GoogleAuthProvider.authenticate(token, fcm_token=fcm_token)
 
 
-async def authenticate_with_apple(token: str) -> dict:
+async def authenticate_with_apple(token: str, fcm_token: str | None = None) -> dict:
     """
     Apple 로그인을 처리합니다.
     
@@ -45,10 +45,10 @@ async def authenticate_with_apple(token: str) -> dict:
             "user": UserInDB 객체
         }
     """
-    return await AppleAuthProvider.authenticate(token)
+    return await AppleAuthProvider.authenticate(token, fcm_token=fcm_token)
 
 
-async def authenticate_with_kakao(token: str) -> dict:
+async def authenticate_with_kakao(token: str, fcm_token: str | None = None) -> dict:
     """
     Kakao 로그인을 처리합니다.
     
@@ -62,7 +62,7 @@ async def authenticate_with_kakao(token: str) -> dict:
             "user": UserInDB 객체
         }
     """
-    return await KakaoAuthProvider.authenticate(token)
+    return await KakaoAuthProvider.authenticate(token, fcm_token=fcm_token)
 
 
 # ============================================

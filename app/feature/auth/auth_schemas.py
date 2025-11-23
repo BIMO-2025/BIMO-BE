@@ -1,4 +1,5 @@
 from pydantic import BaseModel, ConfigDict
+from typing import Optional
 
 # --- 요청 스키마 ---
 
@@ -8,6 +9,7 @@ class SocialLoginRequest(BaseModel):
     Google, Apple, Kakao 모두 이 스키마를 사용할 수 있습니다.
     """
     token: str
+    fcm_token: Optional[str] = None  # FCM 디바이스 토큰 (선택사항)
 
     model_config = ConfigDict(from_attributes=True)
 

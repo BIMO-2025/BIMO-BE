@@ -67,6 +67,7 @@ class BaseAuthProvider(ABC):
         display_name: str | None,
         photo_url: str | None,
         provider_id: str,
+        fcm_token: str | None = None,
     ) -> UserInDB:
         """
         [비동기 함수] Firestore에서 사용자를 조회하거나 생성합니다.
@@ -91,11 +92,24 @@ class BaseAuthProvider(ABC):
             current_time = datetime.now(timezone.utc)
 
             if user_doc.exists:
-                # 기존 사용자: 마지막 로그인 시간 업데이트
+                # 기존 사용자: 마지막 로그인 시간 및 FCM 토큰 업데이트
                 user_data = user_doc.to_dict()
                 user_data["last_login_at"] = current_time
-
-                await run_in_threadpool(user_ref.update, {"last_login_at": current_time})
+                
+                # FCM 토큰 업데이트 (있을 경우)
+                update_data = {"last_login_at": current_time}
+                if fcm_token:
+                    fcm_tokens = user_data.get("fcm_tokens", [])
+                    if fcm_token not in fcm_tokens:
+                        fcm_tokens.append(fcm_token)
+                        update_data["fcm_tokens"] = fcm_tokens
+                
+                await run_in_threadpool(user_ref.update, update_data)
+                
+                # 업데이트된 데이터 반영
+                if fcm_token and "fcm_tokens" in update_data:
+                    user_data["fcm_tokens"] = update_data["fcm_tokens"]
+                user_data["last_login_at"] = current_time
 
                 # datetime 필드 정규화
                 user_data = BaseAuthProvider._normalize_datetime_fields(user_data)
@@ -111,8 +125,15 @@ class BaseAuthProvider(ABC):
                     provider_id=provider_id
                 )
 
+                # FCM 토큰 포함하여 사용자 데이터 생성
+                user_data_dict = new_user_data.model_dump()
+                if fcm_token:
+                    user_data_dict["fcm_tokens"] = [fcm_token]
+                else:
+                    user_data_dict["fcm_tokens"] = []
+                
                 user_in_db_data = UserInDB(
-                    **new_user_data.model_dump(),
+                    **user_data_dict,
                     created_at=current_time,
                     last_login_at=current_time
                 )

@@ -70,7 +70,7 @@ class FirebaseAuthProvider(BaseAuthProvider, ABC):
             raise TokenVerificationError(message=f"Firebase 비동기 토큰 검증 중 오류: {e}")
 
     @classmethod
-    async def get_or_create_user(cls, decoded_token: dict, provider_name: str) -> UserInDB:
+    async def get_or_create_user(cls, decoded_token: dict, provider_name: str, fcm_token: str | None = None) -> UserInDB:
         """
         [비동기 함수] 검증된 토큰 정보를 바탕으로 Firestore에서 사용자를 조회하거나 생성합니다.
         
@@ -104,5 +104,6 @@ class FirebaseAuthProvider(BaseAuthProvider, ABC):
             display_name=display_name,
             photo_url=photo_url,
             provider_id=provider_id,
+            fcm_token=fcm_token,
         )
 
