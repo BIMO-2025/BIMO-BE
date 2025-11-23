@@ -1,8 +1,8 @@
 import firebase_admin
-from firebase_admin import credentials, firestore, auth
+from firebase_admin import auth, credentials, firestore
+
 from app.core.config import FIREBASE_KEY_PATH
-# AppConfigError를 임포트
-from app.core.exceptions.exception_handlers import AppConfigError
+from app.core.exceptions.exceptions import AppConfigError
 
 # 모듈 레벨에서 변수를 선언합니다.
 # 초기화에 실패하면 이 변수들은 None으로 남겠지만,
