@@ -8,6 +8,7 @@ from app.feature.auth import auth_router
 from app.feature.reviews import reviews_router
 from app.feature.wellness import wellness_router
 from app.feature.notifications import notification_router
+from app.feature.offline import offline_router
 
 # 2. Firebase 초기화 실행
 from app.core import firebase
@@ -15,6 +16,9 @@ from app.core import firebase
 # 3. 커스텀 예외 핸들러 import
 from app.core.exceptions.exceptions import CustomException
 from app.core.exceptions.exception_handlers import custom_exception_handler
+
+# 4. 오프라인 기능 import
+from app.core.offline import get_network_monitor
 
 
 # 4. FastAPI 앱 인스턴스 생성
@@ -40,3 +44,23 @@ app.include_router(llm_router.router)
 app.include_router(reviews_router.router)
 app.include_router(wellness_router.router)
 app.include_router(notification_router.router)
+app.include_router(offline_router.router)
+
+
+# 6. 애플리케이션 생명주기 이벤트
+@app.on_event("startup")
+async def startup_event():
+    """애플리케이션 시작 시 실행"""
+    # 네트워크 모니터링 시작
+    network_monitor = get_network_monitor()
+    await network_monitor.start_monitoring(interval=30)
+    print("✅ 네트워크 모니터링이 시작되었습니다.")
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """애플리케이션 종료 시 실행"""
+    # 네트워크 모니터링 중지
+    network_monitor = get_network_monitor()
+    await network_monitor.stop_monitoring()
+    print("🛑 네트워크 모니터링이 중지되었습니다.")
