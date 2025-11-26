@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field, ConfigDict
-from typing import Dict, Literal, Optional
+from typing import Dict, Literal, Optional, List
 from datetime import datetime, timezone
 
 class MyFlightSchema(BaseModel):
@@ -66,3 +66,31 @@ class AirlineSchema(BaseModel):
             }
         }
     )
+
+class FlightSearchResult(BaseModel):
+    """항공편 검색 결과 항목 (API 출력 모델)"""
+    # --- 외부 API가 제공할 정보 ---
+    flightNumber: str       # "KE901"
+    airlineCode: str        # "KE"
+    airlineName: str        # "대한항공"
+    departureAirport: str   # "ICN"
+    arrivalAirport: str     # "CDG"
+    departureTime: datetime # (ISO 8601 형식)
+    arrivalTime: datetime
+    layovers: List[str]     # 경유지 공항 코드, 직항이면 []
+    
+    # --- 추가 정보 (프론트엔드 표시용) ---
+    price: float
+    currency: str = "KRW"
+    duration: str  # 예: "11h 30m"
+    seatsAvailable: int
+
+class FlightSearchResponse(BaseModel):
+    """
+    항공편 검색 결과 응답
+    """
+    origin: str
+    destination: str
+    date: str
+    totalResults: int
+    offers: list[FlightSearchResult]
