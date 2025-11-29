@@ -8,6 +8,7 @@ from app.feature.auth import auth_router
 from app.feature.reviews import reviews_router
 from app.feature.wellness import wellness_router
 from app.feature.notifications import notification_router
+from app.feature.flights import flights_router
 
 # 2. Firebase 초기화 실행
 from app.core import firebase
@@ -40,3 +41,4 @@ app.include_router(llm_router.router)
 app.include_router(reviews_router.router)
 app.include_router(wellness_router.router)
 app.include_router(notification_router.router)
+app.include_router(flights_router.router)
