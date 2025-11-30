@@ -145,12 +145,13 @@ class KakaoAuthProvider(BaseAuthProvider):
             raise DatabaseError(message=f"Firebase Auth 사용자 조회 중 오류: {e}")
 
     @classmethod
-    async def get_or_create_user(cls, firebase_user: UserRecord) -> UserInDB:
+    async def get_or_create_user(cls, firebase_user: UserRecord, fcm_token: str | None = None) -> UserInDB:
         """
         [비동기 함수] Firebase Auth 사용자 정보를 바탕으로 Firestore에서 사용자를 조회하거나 생성합니다.
         
         Args:
             firebase_user: Firebase Auth UserRecord
+            fcm_token: FCM 토큰 (선택 사항)
             
         Returns:
             Firestore에 저장된 사용자 정보 (UserInDB)
