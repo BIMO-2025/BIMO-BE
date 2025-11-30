@@ -85,33 +85,45 @@ class AmadeusClient:
         try:
             # 동기 Amadeus API 호출을 비동기로 실행
             def _search():
-                if return_date:
-                    # 왕복 항공편 검색
-                    response = self.client.shopping.flight_offers_search.get(
-                        originLocationCode=origin.upper(),
-                        destinationLocationCode=destination.upper(),
-                        departureDate=departure_date,
-                        returnDate=return_date,
-                        adults=adults,
-                        max=50,  # 최대 50개 결과 반환
-                    )
-                else:
-                    # 편도 항공편 검색
-                    response = self.client.shopping.flight_offers_search.get(
-                        originLocationCode=origin.upper(),
-                        destinationLocationCode=destination.upper(),
-                        departureDate=departure_date,
-                        adults=adults,
-                        max=50,  # 최대 50개 결과 반환
-                    )
+                try:
+                    if return_date:
+                        # 왕복 항공편 검색
+                        response = self.client.shopping.flight_offers_search.get(
+                            originLocationCode=origin.upper(),
+                            destinationLocationCode=destination.upper(),
+                            departureDate=departure_date,
+                            returnDate=return_date,
+                            adults=adults,
+                            max=50,  # 최대 50개 결과 반환
+                        )
+                    else:
+                        # 편도 항공편 검색
+                        response = self.client.shopping.flight_offers_search.get(
+                            originLocationCode=origin.upper(),
+                            destinationLocationCode=destination.upper(),
+                            departureDate=departure_date,
+                            adults=adults,
+                            max=50,  # 최대 50개 결과 반환
+                        )
 
-                # 응답 데이터 반환
-                if hasattr(response, "data"):
-                    return response.data
-                elif isinstance(response, dict) and "data" in response:
-                    return response["data"]
-                else:
-                    return response
+                    # 응답 데이터 반환
+                    if hasattr(response, "data"):
+                        return response.data
+                    elif isinstance(response, dict) and "data" in response:
+                        return response["data"]
+                    else:
+                        return response
+                except Exception as api_exc:
+                    # Amadeus SDK의 ResponseError 등 상세 에러 정보 추출
+                    error_details = str(api_exc)
+                    if hasattr(api_exc, "response"):
+                        if hasattr(api_exc.response, "body"):
+                            error_details += f" | Response: {api_exc.response.body}"
+                        if hasattr(api_exc.response, "status_code"):
+                            error_details += f" | Status: {api_exc.response.status_code}"
+                    if hasattr(api_exc, "description"):
+                        error_details += f" | Description: {api_exc.description}"
+                    raise Exception(error_details) from api_exc
 
             response = await run_in_threadpool(_search)
             return response
