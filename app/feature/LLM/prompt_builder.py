@@ -92,4 +92,3 @@ def _format_flight_info(flight: FlightInfo) -> str:
         return ""
 
     return "Flight context :: " + ", ".join(fields)
-

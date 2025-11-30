@@ -56,12 +56,16 @@ class GeminiClient:
             )
         except Exception as exc:
             raise ExternalApiError(
-                message=f"Gemini 요청 중 오류가 발생했습니다: {exc}"
+                provider="Gemini",
+                message=f"Gemini 요청 중 오류가 발생했습니다: {exc}",
             )
 
         text = getattr(response, "text", "")
         if not text or not text.strip():
-            raise ExternalApiError(message="Gemini 응답이 비어 있습니다.")
+            raise ExternalApiError(
+                provider="Gemini",
+                message="Gemini 응답이 비어 있습니다.",
+            )
 
         return text.strip()
 
@@ -69,4 +73,3 @@ class GeminiClient:
 gemini_client = GeminiClient()
 
 __all__ = ["GeminiClient", "gemini_client"]
-

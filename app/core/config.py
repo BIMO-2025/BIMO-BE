@@ -28,3 +28,8 @@ except ValueError:
 # LLM(Gemini) 설정
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 GEMINI_MODEL_NAME = os.getenv("GEMINI_MODEL_NAME", "gemini-1.5-flash")
+
+# Amadeus API 설정
+AMADEUS_API_KEY = os.getenv("AMADEUS_API_KEY")
+AMADEUS_API_SECRET = os.getenv("AMADEUS_API_SECRET")
+AMADEUS_ENVIRONMENT = os.getenv("AMADEUS_ENVIRONMENT", "test")  # "test" or "production"

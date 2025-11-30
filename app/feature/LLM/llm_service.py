@@ -5,6 +5,8 @@ from app.feature.LLM.prompt_builder import (
     build_prompt_segments,
 )
 
+MODEL_NAME = gemini_client.model_name
+
 
 async def generate_chat_completion(request: LLMChatRequest) -> str:
     """

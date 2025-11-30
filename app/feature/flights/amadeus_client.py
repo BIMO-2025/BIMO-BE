@@ -1,0 +1,144 @@
+from typing import Optional
+
+from fastapi.concurrency import run_in_threadpool
+
+from app.core.config import AMADEUS_API_KEY, AMADEUS_API_SECRET, AMADEUS_ENVIRONMENT
+from app.core.exceptions.exceptions import AppConfigError, ExternalApiError
+
+
+class AmadeusClient:
+    """
+    Amadeus API SDK 초기화 및 항공편 검색 요청 실행을 담당하는 어댑터.
+    """
+
+    def __init__(
+        self,
+        api_key: str | None = AMADEUS_API_KEY,
+        api_secret: str | None = AMADEUS_API_SECRET,
+        environment: str | None = AMADEUS_ENVIRONMENT,
+    ) -> None:
+        self._import_sdk()
+        self._configure(api_key, api_secret, environment)
+
+    @staticmethod
+    def _import_sdk():
+        try:
+            # Amadeus SDK import 확인
+            import amadeus
+            return amadeus
+        except ModuleNotFoundError as exc:
+            raise AppConfigError(
+                "필수 패키지 'amadeus'가 설치되지 않았습니다. "
+                "pip install amadeus 로 설치하세요."
+            ) from exc
+
+    def _configure(
+        self, api_key: str | None, api_secret: str | None, environment: str | None
+    ) -> None:
+        if not api_key or not api_secret:
+            raise AppConfigError(
+                "환경 변수 'AMADEUS_API_KEY'와 'AMADEUS_API_SECRET'이 설정되지 않았습니다. .env를 확인하세요."
+            )
+
+        # Amadeus 클라이언트 초기화
+        try:
+            from amadeus import Client
+        except ImportError:
+            raise AppConfigError(
+                "Amadeus Client를 import할 수 없습니다. amadeus 패키지가 올바르게 설치되었는지 확인하세요."
+            )
+
+        # test 환경은 'test', production 환경은 'production' 사용
+        is_production = environment == "production"
+        self.client = Client(
+            client_id=api_key,
+            client_secret=api_secret,
+            hostname=(
+                "production" if is_production else "test"
+            ),  # 'test' 또는 'production'
+        )
+
+    async def search_flights(
+        self,
+        origin: str,
+        destination: str,
+        departure_date: str,
+        adults: int = 1,
+        return_date: Optional[str] = None,
+    ) -> dict:
+        """
+        항공편을 검색합니다.
+
+        Args:
+            origin: 출발지 공항 코드 (예: "ICN", "JFK")
+            destination: 도착지 공항 코드 (예: "ICN", "JFK")
+            departure_date: 출발 날짜 (YYYY-MM-DD 형식)
+            adults: 성인 승객 수 (기본값: 1)
+            return_date: 귀국 날짜 (선택사항, YYYY-MM-DD 형식)
+
+        Returns:
+            검색된 항공편 정보를 담은 딕셔너리
+
+        Raises:
+            ExternalApiError: Amadeus API 호출 중 오류 발생 시
+        """
+        try:
+            # 동기 Amadeus API 호출을 비동기로 실행
+            def _search():
+                try:
+                    if return_date:
+                        # 왕복 항공편 검색
+                        response = self.client.shopping.flight_offers_search.get(
+                            originLocationCode=origin.upper(),
+                            destinationLocationCode=destination.upper(),
+                            departureDate=departure_date,
+                            returnDate=return_date,
+                            adults=adults,
+                            max=50,  # 최대 50개 결과 반환
+                        )
+                    else:
+                        # 편도 항공편 검색
+                        response = self.client.shopping.flight_offers_search.get(
+                            originLocationCode=origin.upper(),
+                            destinationLocationCode=destination.upper(),
+                            departureDate=departure_date,
+                            adults=adults,
+                            max=50,  # 최대 50개 결과 반환
+                        )
+
+                    # 응답 데이터 반환
+                    if hasattr(response, "data"):
+                        return response.data
+                    elif isinstance(response, dict) and "data" in response:
+                        return response["data"]
+                    else:
+                        return response
+                except Exception as api_exc:
+                    # Amadeus SDK의 ResponseError 등 상세 에러 정보 추출
+                    error_details = str(api_exc)
+                    if hasattr(api_exc, "response"):
+                        if hasattr(api_exc.response, "body"):
+                            error_details += f" | Response: {api_exc.response.body}"
+                        if hasattr(api_exc.response, "status_code"):
+                            error_details += f" | Status: {api_exc.response.status_code}"
+                    if hasattr(api_exc, "description"):
+                        error_details += f" | Description: {api_exc.description}"
+                    raise Exception(error_details) from api_exc
+
+            response = await run_in_threadpool(_search)
+            return response
+
+        except ExternalApiError:
+            raise
+        except Exception as exc:
+            error_message = str(exc)
+            raise ExternalApiError(
+                provider="Amadeus",
+                detail=f"항공편 검색 중 오류가 발생했습니다: {error_message}",
+            ) from exc
+
+
+amadeus_client = AmadeusClient()
+
+__all__ = ["AmadeusClient", "amadeus_client"]
+

@@ -1,6 +1,6 @@
 from typing import List, Optional
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, model_validator, ConfigDict
 
 
 class FlightInfo(BaseModel):
@@ -34,6 +34,8 @@ class FlightInfo(BaseModel):
         default=None, description="기내식/식단 정보 (예: 채식, 한식)"
     )
 
+    model_config = ConfigDict(from_attributes=True)
+
 
 class ImageAttachment(BaseModel):
     """
@@ -52,6 +54,8 @@ class ImageAttachment(BaseModel):
         default=None,
         description="원격 이미지 URL (사전 서명 URL 등)",
     )
+
+    model_config = ConfigDict(from_attributes=True)
 
     @model_validator(mode="after")
     def validate_source(self):
@@ -83,6 +87,8 @@ class LLMChatRequest(BaseModel):
         description="항공편 정보를 담고 있는 이미지 목록 (탑승권, 좌석표 등)",
     )
 
+    model_config = ConfigDict(from_attributes=True)
+
 
 class LLMChatResponse(BaseModel):
     """
@@ -92,3 +98,4 @@ class LLMChatResponse(BaseModel):
     model: str
     content: str
 
+    model_config = ConfigDict(from_attributes=True)
