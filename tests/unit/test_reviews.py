@@ -21,16 +21,18 @@ class TestReviewsService:
         mock_doc1.id = "review-1"
         mock_doc1.to_dict.return_value = {
             "userId": "user-1",
+            "userNickname": "User1",
             "airlineCode": "KE",
             "airlineName": "대한항공",
+            "route": "ICN-JFK",
             "text": "좋은 항공사",
             "overallRating": 4.5,
             "ratings": {
-                "seatComfort": 4.0,
-                "inflightMeal": 4.5,
-                "service": 5.0,
-                "cleanliness": 4.0,
-                "checkIn": 4.5
+                "seatComfort": 4,
+                "inflightMeal": 4,
+                "service": 5,
+                "cleanliness": 4,
+                "checkIn": 4
             },
             "createdAt": datetime.now(timezone.utc).isoformat()
         }
@@ -39,16 +41,18 @@ class TestReviewsService:
         mock_doc2.id = "review-2"
         mock_doc2.to_dict.return_value = {
             "userId": "user-2",
+            "userNickname": "User2",
             "airlineCode": "KE",
             "airlineName": "대한항공",
+            "route": "ICN-LAX",
             "text": "매우 만족",
             "overallRating": 5.0,
             "ratings": {
-                "seatComfort": 5.0,
-                "inflightMeal": 5.0,
-                "service": 5.0,
-                "cleanliness": 5.0,
-                "checkIn": 5.0
+                "seatComfort": 5,
+                "inflightMeal": 5,
+                "service": 5,
+                "cleanliness": 5,
+                "checkIn": 5
             },
             "createdAt": datetime.now(timezone.utc).isoformat()
         }
@@ -89,16 +93,18 @@ class TestReviewsService:
         mock_doc.exists = True
         mock_doc.to_dict.return_value = {
             "userId": "user-1",
+            "userNickname": "User1",
             "airlineCode": "KE",
             "airlineName": "대한항공",
+            "route": "ICN-JFK",
             "text": "좋은 항공사",
             "overallRating": 4.5,
             "ratings": {
-                "seatComfort": 4.0,
-                "inflightMeal": 4.5,
-                "service": 5.0,
-                "cleanliness": 4.0,
-                "checkIn": 4.5
+                "seatComfort": 4,
+                "inflightMeal": 4,
+                "service": 5,
+                "cleanliness": 4,
+                "checkIn": 4
             },
             "createdAt": datetime.now(timezone.utc).isoformat()
         }
@@ -150,16 +156,18 @@ class TestReviewsService:
             ReviewSchema(
                 id="review-1",
                 userId="user-1",
+                userNickname="User1",
                 airlineCode="KE",
                 airlineName="대한항공",
+                route="ICN-JFK",
                 text="좋은 항공사입니다",
                 overallRating=4.5,
                 ratings=RatingsSchema(
-                    seatComfort=4.0,
-                    inflightMeal=4.5,
-                    service=5.0,
-                    cleanliness=4.0,
-                    checkIn=4.5
+                    seatComfort=4,
+                    inflightMeal=4,
+                    service=5,
+                    cleanliness=4,
+                    checkIn=4
                 ),
                 createdAt=datetime.now(timezone.utc)
             )

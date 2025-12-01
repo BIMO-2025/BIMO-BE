@@ -65,7 +65,7 @@ async def get_review_by_id(review_id: str) -> ReviewSchema:
         doc = await run_in_threadpool(doc_ref.get)
         
         if not doc.exists:
-            raise ReviewNotFoundError(message=f"리뷰를 찾을 수 없습니다: {review_id}")
+            raise ReviewNotFoundError(review_id=review_id)
         
         review_data = doc.to_dict()
         return ReviewSchema(**review_data)

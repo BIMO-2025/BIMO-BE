@@ -38,6 +38,7 @@ class ReviewSchema(BaseModel):
     경로: reviews/{reviewId}
     """
     userId: str
+    id: Optional[str] = None
     userNickname: str
     airlineCode: str
     airlineName: str

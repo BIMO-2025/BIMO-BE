@@ -130,7 +130,7 @@ class TestFirebaseAuthProvider:
         """만료된 토큰"""
         from firebase_admin.auth import ExpiredIdTokenError
         
-        mock_firebase_auth.verify_id_token = Mock(side_effect=ExpiredIdTokenError("Token expired"))
+        mock_firebase_auth.verify_id_token = Mock(side_effect=ExpiredIdTokenError("Token expired", cause=None))
         
         with patch("app.feature.auth.providers.firebase_provider.auth_client", mock_firebase_auth):
             with pytest.raises(TokenExpiredError):
@@ -141,7 +141,7 @@ class TestFirebaseAuthProvider:
         """유효하지 않은 토큰"""
         from firebase_admin.auth import InvalidIdTokenError
         
-        mock_firebase_auth.verify_id_token = Mock(side_effect=InvalidIdTokenError("Invalid token"))
+        mock_firebase_auth.verify_id_token = Mock(side_effect=InvalidIdTokenError("Invalid token", cause=None))
         
         with patch("app.feature.auth.providers.firebase_provider.auth_client", mock_firebase_auth):
             with pytest.raises(InvalidTokenError):

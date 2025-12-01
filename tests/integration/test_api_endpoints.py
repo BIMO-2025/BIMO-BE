@@ -133,16 +133,18 @@ class TestReviewsEndpoints:
                 ReviewSchema(
                     id="review-1",
                     userId="user-1",
+                    userNickname="User1",
                     airlineCode="KE",
                     airlineName="대한항공",
+                    route="ICN-JFK",
                     text="좋은 항공사",
                     overallRating=4.5,
                     ratings=RatingsSchema(
-                        seatComfort=4.0,
-                        inflightMeal=4.5,
-                        service=5.0,
-                        cleanliness=4.0,
-                        checkIn=4.5
+                        seatComfort=4,
+                        inflightMeal=4,
+                        service=5,
+                        cleanliness=4,
+                        checkIn=4
                     ),
                     createdAt=datetime.now(timezone.utc)
                 )
@@ -167,16 +169,18 @@ class TestReviewsEndpoints:
             mock_review = ReviewSchema(
                 id="review-123",
                 userId="user-1",
+                userNickname="User1",
                 airlineCode="KE",
                 airlineName="대한항공",
+                route="ICN-JFK",
                 text="좋은 항공사",
                 overallRating=4.5,
                 ratings=RatingsSchema(
-                    seatComfort=4.0,
-                    inflightMeal=4.5,
-                    service=5.0,
-                    cleanliness=4.0,
-                    checkIn=4.5
+                    seatComfort=4,
+                    inflightMeal=4,
+                    service=5,
+                    cleanliness=4,
+                    checkIn=4
                 ),
                 createdAt=datetime.now(timezone.utc)
             )
@@ -204,11 +208,25 @@ class TestWellnessEndpoints:
             mock_response = JetLagPlanResponse(
                 daily_schedules=[
                     DailySchedule(
-                        date=base_time.date(),
-                        recommendations=["충분한 수면", "가벼운 운동"]
+                        date=base_time.date().isoformat(),
+                        recommendations=["충분한 수면", "가벼운 운동"],
+                        activities=["휴식"],
+                        notes="메모",
+                        day_number=1,
+                        local_timezone="America/New_York",
+                        sleep_window="22:00-07:00",
+                        meal_times=["08:00", "13:00", "19:00"]
                     )
                 ],
-                summary="시차적응 계획 요약"
+                summary="시차적응 계획 요약",
+                general_recommendations=["물 많이 마시기"],
+                pre_flight_tips=["충분한 휴식"],
+                post_arrival_tips=["햇빛 쐬기"],
+                algorithm_explanation="알고리즘 설명",
+                origin_timezone="Asia/Seoul",
+                destination_timezone="America/New_York",
+                time_difference_hours=14,
+                total_flight_duration_hours=14
             )
             
             mock_generate.return_value = mock_response
@@ -257,7 +275,9 @@ class TestLLMEndpoints:
             
             assert response.status_code == 200
             data = response.json()
-            assert "response" in data or "text" in data or isinstance(data, str)
+            assert response.status_code == 200
+            data = response.json()
+            assert "content" in data or "response" in data or "text" in data or isinstance(data, str)
 
 
 class TestErrorHandling:
