@@ -1,25 +1,29 @@
 """
-항공편 검색 API 라우터
+항공편 검색 관련 API 라우터
 """
 
-from fastapi import APIRouter, Depends, Query
-from app.feature.flights.flights_schemas import FlightSearchResponse
-from app.feature.flights.flights_service import get_flight_service, FlightService
+from fastapi import APIRouter
 
-router = APIRouter(prefix="/flights", tags=["flights"])
+from app.feature.flights import flights_schemas, flights_service
 
-@router.get("/search", response_model=FlightSearchResponse)
-async def search_flights(
-    origin: str = Query(..., description="출발지 공항 코드 (예: ICN)"),
-    destination: str = Query(..., description="도착지 공항 코드 (예: JFK)"),
-    date: str = Query(..., description="출발 날짜 (YYYY-MM-DD)"),
-    service: FlightService = Depends(get_flight_service)
-):
+router = APIRouter(
+    prefix="/flights",
+    tags=["Flights"],
+    responses={404: {"description": "Not found"}},
+)
+
+
+@router.post("/search", response_model=flights_schemas.FlightSearchResponse)
+async def search_flights(request: flights_schemas.FlightSearchRequest):
     """
-    항공편 검색 API
-    
-    - **origin**: 출발지 공항 코드 (IATA 3자리)
-    - **destination**: 도착지 공항 코드 (IATA 3자리)
-    - **date**: 출발 날짜 (YYYY-MM-DD)
+    출발지, 도착지, 날짜를 기반으로 예약 가능한 항공편을 검색합니다.
+
+    - **origin**: 출발지 공항 코드 (예: ICN, JFK, LAX)
+    - **destination**: 도착지 공항 코드 (예: ICN, JFK, LAX)
+    - **departure_date**: 출발 날짜 (YYYY-MM-DD 형식)
+    - **adults**: 성인 승객 수 (기본값: 1, 최대: 9)
+
+    Amadeus API를 사용하여 실시간 항공편 정보를 조회합니다. (편도 검색만 지원)
     """
-    return service.search_flights(origin, destination, date)
+    return await flights_service.search_flights(request)
+

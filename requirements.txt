@@ -13,12 +13,16 @@ firebase-admin>=6.3.0
 # 인증 및 보안
 python-jose[cryptography]>=3.3.0
 passlib[bcrypt]>=1.7.4
+bcrypt==3.2.2
 
 # HTTP 클라이언트 (Kakao API 호출용)
-httpx>=0.25.0
+httpx>=0.25.0,<0.28.0
 
 # LLM (Gemini API)
 google-generativeai>=0.3.0
+
+# Amadeus API
+amadeus>=9.0.0
 
 # 시간대 처리 (시차적응 알고리즘)
 pytz>=2024.1
@@ -28,6 +32,6 @@ pytest>=7.4.0
 pytest-asyncio>=0.21.0
 pytest-cov>=4.1.0
 pytest-mock>=3.11.1
-httpx>=0.25.0
+
 
 

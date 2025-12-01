@@ -67,30 +67,126 @@ class AirlineSchema(BaseModel):
         }
     )
 
-class FlightSearchResult(BaseModel):
-    """항공편 검색 결과 항목 (API 출력 모델)"""
-    # --- 외부 API가 제공할 정보 ---
-    flightNumber: str       # "KE901"
-    airlineCode: str        # "KE"
-    airlineName: str        # "대한항공"
-    departureAirport: str   # "ICN"
-    arrivalAirport: str     # "CDG"
-    departureTime: datetime # (ISO 8601 형식)
-    arrivalTime: datetime
-    layovers: List[str]     # 경유지 공항 코드, 직항이면 []
-    
-    # --- 추가 정보 (프론트엔드 표시용) ---
-    price: float
-    currency: str = "KRW"
-    duration: str  # 예: "11h 30m"
-    seatsAvailable: int
+
+# ===========================================================================
+# 항공편 검색 관련 스키마
+# ===========================================================================
+
+
+class FlightSearchRequest(BaseModel):
+    """
+    항공편 검색 요청 스키마
+    """
+    origin: str = Field(..., description="출발지 공항 코드 (예: ICN, JFK)", min_length=3, max_length=3)
+    destination: str = Field(..., description="도착지 공항 코드 (예: ICN, JFK)", min_length=3, max_length=3)
+    departure_date: str = Field(..., description="출발 날짜 (YYYY-MM-DD 형식)", pattern=r"^\d{4}-\d{2}-\d{2}$")
+    adults: int = Field(1, description="성인 승객 수", ge=1, le=9)
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "origin": "ICN",
+                "destination": "JFK",
+                "departure_date": "2025-06-15",
+                "adults": 1
+            }
+        }
+    )
+
+
+class PriceSchema(BaseModel):
+    """
+    항공편 가격 정보
+    """
+    total: str = Field(..., description="총 가격")
+    base: str = Field(..., description="기본 가격")
+    currency: str = Field(..., description="통화 코드 (예: USD, KRW)")
+
+
+class SegmentSchema(BaseModel):
+    """
+    항공편 구간 정보
+    """
+    departure: Dict = Field(..., description="출발 정보 (공항 코드, 시간 등)")
+    arrival: Dict = Field(..., description="도착 정보 (공항 코드, 시간 등)")
+    carrier_code: str = Field(..., description="항공사 코드")
+    number: str = Field(..., description="항공편 번호")
+    aircraft: Optional[Dict] = Field(None, description="항공기 정보")
+    duration: Optional[str] = Field(None, description="비행 시간")
+
+
+class ItinerarySchema(BaseModel):
+    """
+    항공편 여정 정보
+    """
+    duration: str = Field(..., description="전체 여정 시간")
+    segments: List[SegmentSchema] = Field(..., description="구간 정보 리스트")
+
+
+class FlightOfferSchema(BaseModel):
+    """
+    검색된 항공편 제안 정보
+    """
+    id: str = Field(..., description="항공편 제안 ID")
+    source: str = Field(..., description="데이터 소스")
+    instant_ticketing_required: bool = Field(False, description="즉시 발권 필요 여부")
+    non_homogeneous: bool = Field(False, description="동일 항공사 여부")
+    one_way: bool = Field(False, description="편도 여부")
+    last_ticketing_date: Optional[str] = Field(None, description="마지막 발권일")
+    number_of_bookable_seats: Optional[int] = Field(None, description="예약 가능한 좌석 수")
+    itineraries: List[ItinerarySchema] = Field(..., description="여정 정보 리스트")
+    price: PriceSchema = Field(..., description="가격 정보")
+    validating_airline_codes: List[str] = Field(default_factory=list, description="유효한 항공사 코드 리스트")
+    traveler_pricings: Optional[List[Dict]] = Field(None, description="승객별 가격 정보")
+
+    model_config = ConfigDict(
+        from_attributes=True,
+        json_schema_extra={
+            "example": {
+                "id": "1",
+                "source": "GDS",
+                "one_way": False,
+                "itineraries": [
+                    {
+                        "duration": "PT14H30M",
+                        "segments": [
+                            {
+                                "departure": {
+                                    "iataCode": "ICN",
+                                    "at": "2025-06-15T10:00:00"
+                                },
+                                "arrival": {
+                                    "iataCode": "JFK",
+                                    "at": "2025-06-15T14:30:00"
+                                },
+                                "carrier_code": "KE",
+                                "number": "901"
+                            }
+                        ]
+                    }
+                ],
+                "price": {
+                    "total": "1200.00",
+                    "base": "1000.00",
+                    "currency": "USD"
+                }
+            }
+        }
+    )
+
 
 class FlightSearchResponse(BaseModel):
     """
-    항공편 검색 결과 응답
+    항공편 검색 응답 스키마
     """
-    origin: str
-    destination: str
-    date: str
-    totalResults: int
-    offers: list[FlightSearchResult]
+    flight_offers: List[FlightOfferSchema] = Field(..., description="검색된 항공편 제안 리스트")
+    count: int = Field(..., description="검색된 항공편 개수")
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "flight_offers": [],
+                "count": 0
+            }
+        }
+    )

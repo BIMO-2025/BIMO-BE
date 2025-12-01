@@ -1,84 +1,70 @@
 """
-항공편 검색 및 관리 서비스
+항공편 검색 관련 비즈니스 로직
 """
 
-import random
-from datetime import datetime, timedelta
-from typing import List
+from app.feature.flights.amadeus_client import amadeus_client
+from app.feature.flights.flights_schemas import (
+    FlightSearchRequest,
+    FlightSearchResponse,
+    FlightOfferSchema,
+)
+from app.core.exceptions.exceptions import ExternalApiError
 
-from app.feature.flights.flights_schemas import FlightSearchResponse, FlightSearchResult
 
-class FlightService:
-    """항공편 관련 비즈니스 로직을 처리하는 서비스 클래스"""
+async def search_flights(request: FlightSearchRequest) -> FlightSearchResponse:
+    """
+    Amadeus API를 사용하여 항공편을 검색합니다.
 
-    def search_flights(self, origin: str, destination: str, date: str) -> FlightSearchResponse:
-        """
-        [Mock] 항공편 검색
-        실제 Amadeus API 대신 모의 데이터를 반환합니다.
-        """
-        # 모의 데이터 생성
-        offers = self._generate_mock_offers(origin, destination, date)
-        
-        return FlightSearchResponse(
-            origin=origin,
-            destination=destination,
-            date=date,
-            totalResults=len(offers),
-            offers=offers
+    Args:
+        request: 항공편 검색 요청 정보
+            - origin: 출발지 공항 코드
+            - destination: 도착지 공항 코드
+            - departure_date: 출발 날짜
+            - adults: 성인 승객 수
+
+    Returns:
+        검색된 항공편 제안 목록
+
+    Raises:
+        ExternalApiError: Amadeus API 호출 중 오류 발생 시
+    """
+    try:
+        # Amadeus API 호출 (편도 검색만 지원)
+        flight_data = await amadeus_client.search_flights(
+            origin=request.origin,
+            destination=request.destination,
+            departure_date=request.departure_date,
+            adults=request.adults,
         )
 
-    def _generate_mock_offers(self, origin: str, destination: str, date_str: str) -> List[FlightSearchResult]:
-        """모의 항공편 제안 목록 생성"""
-        offers = []
-        airlines = [
-            {"code": "KE", "name": "Korean Air"},
-            {"code": "OZ", "name": "Asiana Airlines"},
-            {"code": "DL", "name": "Delta Air Lines"},
-            {"code": "JL", "name": "Japan Airlines"},
-        ]
-        
-        base_date = datetime.strptime(date_str, "%Y-%m-%d")
-        
-        # 5~10개의 랜덤 항공편 생성
-        for i in range(random.randint(5, 10)):
-            airline = random.choice(airlines)
-            
-            # 출발 시간: 검색 날짜의 06:00 ~ 22:00 사이 랜덤
-            hour = random.randint(6, 22)
-            minute = random.choice([0, 15, 30, 45])
-            departure_time = base_date.replace(hour=hour, minute=minute)
-            
-            # 비행 시간: 2시간 ~ 14시간 랜덤
-            duration_hours = random.randint(2, 14)
-            duration_minutes = random.choice([0, 30])
-            arrival_time = departure_time + timedelta(hours=duration_hours, minutes=duration_minutes)
-            
-            # 가격: 200,000 ~ 2,000,000원
-            price = random.randint(20, 200) * 10000
-            
-            offer = FlightSearchResult(
-                flightNumber=f"{airline['code']}{random.randint(100, 999)}",
-                airlineCode=airline["code"],
-                airlineName=airline["name"],
-                departureAirport=origin,
-                arrivalAirport=destination,
-                departureTime=departure_time,
-                arrivalTime=arrival_time,
-                layovers=[],  # 직항으로 가정
-                price=float(price),
-                currency="KRW",
-                duration=f"{duration_hours}h {duration_minutes}m",
-                seatsAvailable=random.randint(1, 9)
-            )
-            offers.append(offer)
-            
-        # 가격순 정렬
-        offers.sort(key=lambda x: x.price)
-        
-        return offers
+        # 응답 데이터가 리스트가 아닌 경우 처리
+        if not isinstance(flight_data, list):
+            flight_data = flight_data if isinstance(flight_data, list) else []
 
-# 싱글톤 인스턴스
-flight_service = FlightService()
+        # Pydantic 모델로 변환
+        flight_offers = []
+        for offer in flight_data:
+            try:
+                # Amadeus 응답을 FlightOfferSchema로 변환
+                flight_offer = FlightOfferSchema(**offer)
+                flight_offers.append(flight_offer)
+            except Exception as e:
+                # 개별 항공편 파싱 실패 시 로그만 남기고 계속 진행
+                print(f"항공편 제안 파싱 실패: {e}")
+                continue
 
-def get_flight_service() -> FlightService:
-    return flight_service
+        return FlightSearchResponse(
+            flight_offers=flight_offers,
+            count=len(flight_offers),
+        )
+
+    except ExternalApiError:
+        # ExternalApiError는 그대로 재발생
+        raise
+    except Exception as e:
+        # 기타 예외는 ExternalApiError로 변환
+        raise ExternalApiError(
+            provider="Amadeus",
+            detail=f"항공편 검색 중 오류가 발생했습니다: {str(e)}",
+        ) from e
+
