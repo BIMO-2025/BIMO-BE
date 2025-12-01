@@ -1,7 +1,8 @@
 import firebase_admin
 from firebase_admin import auth, credentials, firestore
+import json
 
-from app.core.config import FIREBASE_KEY_PATH
+from app.core.config import FIREBASE_KEY_PATH, FIREBASE_CREDENTIALS_JSON
 from app.core.exceptions.exceptions import AppConfigError
 
 # 모듈 레벨에서 변수를 선언합니다.
@@ -10,16 +11,29 @@ from app.core.exceptions.exceptions import AppConfigError
 db = None
 auth_client = None
 
-# 1. .env 설정 확인 (Fail Fast 1)
-if not FIREBASE_KEY_PATH:
+# 1. 설정 확인 (Fail Fast 1)
+if not FIREBASE_KEY_PATH and not FIREBASE_CREDENTIALS_JSON:
     raise AppConfigError(
-        "환경 변수 'FIREBASE_SERVICE_ACCOUNT_KEY'가 설정되지 않았습니다. .env 파일을 확인하세요."
+        "Firebase 설정이 없습니다. 'FIREBASE_SERVICE_ACCOUNT_KEY' 파일 경로 또는 'FIREBASE_CREDENTIALS_JSON' 환경 변수를 설정하세요."
     )
 
 try:
-    # 2. 서비스 키 파일 유효성 검사 (Fail Fast 2)
-    # FileNotFoundError, ValueError 등을 발생시킬 수 있습니다.
-    cred = credentials.Certificate(FIREBASE_KEY_PATH)
+    # 2. 서비스 키 로드 (Fail Fast 2)
+    cred = None
+    
+    if FIREBASE_CREDENTIALS_JSON:
+        # JSON 문자열이 있는 경우 이를 딕셔너리로 파싱하여 사용
+        try:
+            cred_dict = json.loads(FIREBASE_CREDENTIALS_JSON)
+            cred = credentials.Certificate(cred_dict)
+            print("Firebase 인증: 환경 변수(FIREBASE_CREDENTIALS_JSON)를 사용합니다.")
+        except json.JSONDecodeError as e:
+            raise AppConfigError(f"FIREBASE_CREDENTIALS_JSON 환경 변수가 유효한 JSON이 아닙니다: {e}")
+            
+    elif FIREBASE_KEY_PATH:
+        # 파일 경로가 있는 경우
+        cred = credentials.Certificate(FIREBASE_KEY_PATH)
+        print(f"Firebase 인증: 키 파일({FIREBASE_KEY_PATH})을 사용합니다.")
 
     # 3. Firebase Admin SDK 초기화 (Fail Fast 3)
     # 이미 초기화되었으면 에러가 발생할 수 있습니다. (지금 구조에선 괜찮음)

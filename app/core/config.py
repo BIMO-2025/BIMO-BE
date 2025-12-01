@@ -9,6 +9,7 @@ load_dotenv()
 
 # Firebase 설정
 FIREBASE_KEY_PATH = os.getenv("FIREBASE_SERVICE_ACCOUNT_KEY")
+FIREBASE_CREDENTIALS_JSON = os.getenv("FIREBASE_CREDENTIALS_JSON")
 
 # API 자체 JWT 토큰 설정
 API_SECRET_KEY = os.getenv("API_SECRET_KEY")

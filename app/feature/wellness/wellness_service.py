@@ -13,8 +13,8 @@ from app.feature.wellness.wellness_schemas import (
     DailySchedule,
     FlightSegment
 )
-from app.feature.LLM import llm_service
-from app.feature.LLM.llm_schemas import LLMChatRequest
+from app.feature.llm import llm_service
+from app.feature.llm.llm_schemas import LLMChatRequest
 
 
 def calculate_time_difference(origin_tz: str, dest_tz: str) -> int:

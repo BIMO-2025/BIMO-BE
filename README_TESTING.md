@@ -160,7 +160,7 @@ def mock_firebase_db():
 ```python
 @pytest.fixture
 def mock_gemini_client():
-    with patch("app.feature.LLM.gemini_client.gemini_client") as mock_client:
+    with patch("app.feature.llm.gemini_client.gemini_client") as mock_client:
         yield mock_client
 ```
 

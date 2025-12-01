@@ -243,7 +243,7 @@ class TestLLMEndpoints:
     @pytest.mark.asyncio
     async def test_llm_chat(self, client, mock_gemini_client):
         """LLM 채팅 테스트"""
-        with patch("app.feature.LLM.llm_service.generate_chat_completion", new_callable=AsyncMock) as mock_chat:
+        with patch("app.feature.llm.llm_service.generate_chat_completion", new_callable=AsyncMock) as mock_chat:
             mock_chat.return_value = "LLM 응답 텍스트"
             
             request_data = {

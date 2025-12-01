@@ -7,7 +7,7 @@ from fastapi.concurrency import run_in_threadpool
 
 from app.core.firebase import db
 from app.feature.reviews.reviews_schemas import ReviewSchema
-from app.feature.LLM import llm_service
+from app.feature.llm import llm_service
 from app.core.exceptions.exceptions import (
     DatabaseError,
     ReviewNotFoundError,
@@ -157,7 +157,7 @@ async def summarize_reviews(
         "Provide balanced insights highlighting both strengths and areas for improvement."
     )
     
-    from app.feature.LLM.llm_schemas import LLMChatRequest
+    from app.feature.llm.llm_schemas import LLMChatRequest
     request = LLMChatRequest(
         prompt=prompt,
         system_instruction=system_instruction

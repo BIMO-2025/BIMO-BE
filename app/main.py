@@ -3,7 +3,7 @@
 from fastapi import FastAPI
 
 # 1. 기능별 라우터 import
-from app.feature.LLM import llm_router
+from app.feature.llm import llm_router
 from app.feature.auth import auth_router
 from app.feature.reviews import reviews_router
 from app.feature.wellness import wellness_router

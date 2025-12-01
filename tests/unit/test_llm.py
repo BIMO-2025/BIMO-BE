@@ -4,8 +4,8 @@ LLM 모듈 단위 테스트
 import pytest
 from unittest.mock import AsyncMock, patch, MagicMock
 
-from app.feature.LLM import llm_service
-from app.feature.LLM.llm_schemas import LLMChatRequest, FlightInfo, ImageAttachment
+from app.feature.llm import llm_service
+from app.feature.llm.llm_schemas import LLMChatRequest, FlightInfo, ImageAttachment
 
 
 class TestLLMService:

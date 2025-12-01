@@ -1,0 +1,33 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+env
+venv
+ENV
+env.bak
+venv.bak
+
+# IDE
+.idea
+.vscode
+.gemini
+
+# Logs
+*.log
+
+# Tests
+.pytest_cache
+tests
+pytest_minimal.ini
+verify_airlines_count.py
+debug_testclient.py
+
+# Env (보안을 위해 로컬 .env는 제외하고, Cloud Run 환경변수로 설정 권장)
+.env
