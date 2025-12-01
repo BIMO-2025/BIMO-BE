@@ -215,8 +215,13 @@ class UserProfileConflictError(UserProfileError):
 class DatabaseError(CustomException):
     """데이터베이스 작업 중 일반적인 오류가 발생했을 때 사용됩니다."""
 
-    def __init__(self, message: str = "A database error occurred."):
-        super().__init__(status_code=500, error_code="DATABASE_ERROR", message=message)
+    def __init__(
+        self,
+        message: str = "A database error occurred.",
+        status_code: int = 500,
+        error_code: str = "DATABASE_ERROR",
+    ):
+        super().__init__(status_code=status_code, error_code=error_code, message=message)
 
 
 class FlightRecordNotFoundError(DatabaseError):

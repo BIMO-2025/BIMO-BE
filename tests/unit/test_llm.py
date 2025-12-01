@@ -47,7 +47,7 @@ class TestLLMService:
         
         request = LLMChatRequest(
             prompt="질문",
-            context="추가 컨텍스트 정보"
+            context=["추가 컨텍스트 정보"]
         )
         
         result = await llm_service.generate_chat_completion(request)

@@ -41,7 +41,7 @@ def mock_firebase_auth():
 @pytest.fixture
 def mock_gemini_client():
     """Gemini 클라이언트 모킹"""
-    with patch("app.feature.llm.gemini_client.gemini_client") as mock_client:
+    with patch("app.feature.llm.llm_service.gemini_client") as mock_client:
         yield mock_client
 
 

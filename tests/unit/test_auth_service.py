@@ -28,7 +28,7 @@ class TestAuthService:
             result = await auth_service.authenticate_with_google("firebase-token")
             
             assert result == expected_result
-            mock_auth.assert_called_once_with("firebase-token")
+            mock_auth.assert_called_once_with("firebase-token", fcm_token=None)
 
     @pytest.mark.asyncio
     async def test_authenticate_with_apple(self):
@@ -45,7 +45,7 @@ class TestAuthService:
             result = await auth_service.authenticate_with_apple("firebase-token")
             
             assert result == expected_result
-            mock_auth.assert_called_once_with("firebase-token")
+            mock_auth.assert_called_once_with("firebase-token", fcm_token=None)
 
     @pytest.mark.asyncio
     async def test_authenticate_with_kakao(self):
@@ -62,7 +62,7 @@ class TestAuthService:
             result = await auth_service.authenticate_with_kakao("kakao-token")
             
             assert result == expected_result
-            mock_auth.assert_called_once_with("kakao-token")
+            mock_auth.assert_called_once_with("kakao-token", fcm_token=None)
 
     def test_generate_api_token(self):
         """API 토큰 생성 테스트"""
