@@ -49,8 +49,10 @@ async def search_flights(request: FlightSearchRequest) -> FlightSearchResponse:
                 flight_offer = FlightOfferSchema(**offer)
                 flight_offers.append(flight_offer)
             except Exception as e:
-                # 개별 항공편 파싱 실패 시 로그만 남기고 계속 진행
+                # 개별 항공편 파싱 실패 시 상세 로그 출력
+                import json
                 print(f"항공편 제안 파싱 실패: {e}")
+                print(f"원본 데이터 (첫 1000자): {json.dumps(offer, indent=2, ensure_ascii=False)[:1000]}")
                 continue
 
         return FlightSearchResponse(
