@@ -2,7 +2,7 @@
 항공편 검색 관련 비즈니스 로직
 """
 
-from app.feature.flights.amadeus_client import amadeus_client
+from app.core.clients.amadeus import amadeus_client
 from app.feature.flights.flights_schemas import (
     FlightSearchRequest,
     FlightSearchResponse,

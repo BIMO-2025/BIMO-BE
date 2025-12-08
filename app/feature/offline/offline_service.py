@@ -6,10 +6,10 @@
 from typing import Optional, List, Dict, Any, Callable
 from datetime import datetime
 
-from app.core.offline.local_db import LocalDatabase
-from app.core.offline.network_monitor import NetworkMonitor, get_network_monitor
-from app.core.offline.sync_queue import SyncQueue, get_sync_queue
-from app.core.offline.cache_service import CacheService, get_cache_service
+from app.feature.offline.local_db import LocalDatabase
+from app.core.network_monitor import NetworkMonitor
+from app.feature.offline.sync_queue import SyncQueue
+from app.feature.offline.cache_service import CacheService
 from app.core.exceptions.exceptions import DatabaseError, CustomException
 
 
@@ -18,10 +18,10 @@ class OfflineService:
     
     def __init__(
         self,
-        local_db: Optional[LocalDatabase] = None,
-        network_monitor: Optional[NetworkMonitor] = None,
-        sync_queue: Optional[SyncQueue] = None,
-        cache_service: Optional[CacheService] = None
+        local_db: LocalDatabase,
+        network_monitor: NetworkMonitor,
+        sync_queue: SyncQueue,
+        cache_service: CacheService
     ):
         """
         오프라인 서비스 초기화
@@ -32,10 +32,10 @@ class OfflineService:
             sync_queue: 동기화 큐 인스턴스
             cache_service: 캐시 서비스 인스턴스
         """
-        self.local_db = local_db or LocalDatabase()
-        self.network_monitor = network_monitor or get_network_monitor()
-        self.sync_queue = sync_queue or get_sync_queue()
-        self.cache_service = cache_service or get_cache_service()
+        self.local_db = local_db
+        self.network_monitor = network_monitor
+        self.sync_queue = sync_queue
+        self.cache_service = cache_service
     
     async def read_with_fallback(
         self,
@@ -211,6 +211,7 @@ class OfflineService:
             "failed_count": queue_stats.get("failed", 0)
         }
     
+
     async def sync_now(self) -> Dict[str, Any]:
         """
         수동 동기화 실행
@@ -219,21 +220,4 @@ class OfflineService:
             동기화 결과
         """
         return await self.sync_queue.sync_all()
-
-
-# 전역 오프라인 서비스 인스턴스
-_offline_service: Optional[OfflineService] = None
-
-
-def get_offline_service() -> OfflineService:
-    """
-    전역 오프라인 서비스 인스턴스 반환
-    
-    Returns:
-        OfflineService 인스턴스
-    """
-    global _offline_service
-    if _offline_service is None:
-        _offline_service = OfflineService()
-    return _offline_service
 
