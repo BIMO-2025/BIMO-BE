@@ -190,3 +190,20 @@ class NetworkMonitor:
                     self._status = NetworkStatus.OFFLINE
                     self._notify_listeners(NetworkStatus.OFFLINE)
 
+
+# 전역 NetworkMonitor 인스턴스
+_network_monitor: Optional[NetworkMonitor] = None
+
+
+def get_network_monitor() -> NetworkMonitor:
+    """
+    전역 NetworkMonitor 인스턴스 반환
+    
+    Returns:
+        NetworkMonitor 인스턴스
+    """
+    global _network_monitor
+    if _network_monitor is None:
+        _network_monitor = NetworkMonitor()
+    return _network_monitor
+
