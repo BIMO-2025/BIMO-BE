@@ -1,99 +1,50 @@
-"""
-인증 서비스 모듈
-각 프로바이더별 인증 로직을 통합 관리합니다.
-"""
+import uuid
+from datetime import datetime
+from typing import Optional
+from app.core.firebase import db
+from app.feature.auth.models import User, UserCreate, LoginProvider
 
-from app.feature.auth.providers import (
-    GoogleAuthProvider,
-    AppleAuthProvider,
-    KakaoAuthProvider,
-)
+class AuthService:
+    def __init__(self):
+        self.collection = db.collection("users")
 
-# ============================================
-# 각 프로바이더별 인증 함수
-# ============================================
-
-
-async def authenticate_with_google(token: str, fcm_token: str | None = None) -> dict:
-    """
-    Google 로그인을 처리합니다.
-    
-    Args:
-        token: 클라이언트로부터 받은 Firebase ID Token
+    async def login_or_register(self, user_data: UserCreate) -> User:
+        """
+        소셜 로그인 후 회원가입 또는 로그인 처리
+        provider + provider_id로 기존 유저 확인
+        """
+        # 1. 기존 유저 검색
+        query = self.collection.where("provider", "==", user_data.provider.value)\
+                               .where("provider_id", "==", user_data.provider_id)\
+                               .limit(1).stream()
         
-    Returns:
-        {
-            "access_token": "JWT 토큰",
-            "token_type": "bearer",
-            "user": UserInDB 객체
-        }
-    """
-    return await GoogleAuthProvider.authenticate(token, fcm_token=fcm_token)
-
-
-async def authenticate_with_apple(token: str, fcm_token: str | None = None) -> dict:
-    """
-    Apple 로그인을 처리합니다.
-    
-    Args:
-        token: 클라이언트로부터 받은 Firebase ID Token
+        existing_user_doc = next(query, None)
         
-    Returns:
-        {
-            "access_token": "JWT 토큰",
-            "token_type": "bearer",
-            "user": UserInDB 객체
-        }
-    """
-    return await AppleAuthProvider.authenticate(token, fcm_token=fcm_token)
-
-
-async def authenticate_with_kakao(token: str, fcm_token: str | None = None) -> dict:
-    """
-    Kakao 로그인을 처리합니다.
-    
-    Args:
-        token: 클라이언트로부터 받은 Kakao Access Token
+        if existing_user_doc:
+            # 로그인
+            data = existing_user_doc.to_dict()
+            return User(**data)
+        else:
+            # 회원가입
+            new_user = self._create_new_user(user_data)
+            self.collection.document(new_user.id).set(new_user.dict())
+            return new_user
+            
+    def _create_new_user(self, user_data: UserCreate) -> User:
+        user_id = str(uuid.uuid4())
+        nickname = user_data.nickname or f"Traveler_{user_id[:8]}"
         
-    Returns:
-        {
-            "access_token": "JWT 토큰",
-            "token_type": "bearer",
-            "user": UserInDB 객체
-        }
-    """
-    return await KakaoAuthProvider.authenticate(token, fcm_token=fcm_token)
-
-
-# ============================================
-# 하위 호환성을 위한 레거시 함수들
-# (기존 코드와의 호환성을 위해 유지)
-# ============================================
-
-
-async def verify_firebase_id_token(token: str) -> dict:
-    """
-    [레거시 함수] Firebase ID Token을 검증합니다.
-    Google/Apple 공용으로 사용됩니다.
-    
-    Deprecated: GoogleAuthProvider.verify_token 또는 AppleAuthProvider.verify_token 사용을 권장합니다.
-    """
-    return await GoogleAuthProvider.verify_token(token)
-
-
-async def verify_kakao_token(token: str) -> dict:
-    """
-    [레거시 함수] Kakao Access Token을 검증하고 사용자 정보를 가져옵니다.
-    
-    Deprecated: KakaoAuthProvider.verify_token 사용을 권장합니다.
-    """
-    return await KakaoAuthProvider.verify_token(token)
-
-
-def generate_api_token(uid: str) -> str:
-    """
-    [레거시 함수] 우리 서비스 전용 API Access Token (JWT)을 생성합니다.
-    
-    Deprecated: 각 프로바이더의 generate_api_token 메서드 사용을 권장합니다.
-    """
-    return GoogleAuthProvider.generate_api_token(uid)
+        return User(
+            id=user_id,
+            provider=user_data.provider.value,
+            provider_id=user_data.provider_id,
+            email=user_data.email,
+            nickname=nickname,
+            created_at=datetime.utcnow().isoformat()
+        )
+        
+    async def get_user(self, user_id: str) -> Optional[User]:
+        doc = self.collection.document(user_id).get()
+        if doc.exists:
+            return User(**doc.to_dict())
+        return None

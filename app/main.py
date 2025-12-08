@@ -48,6 +48,25 @@ app.include_router(notification_router.router)
 app.include_router(offline_router.router)
 app.include_router(flights_router.router)
 
+# 7. 신규 기능 라우터 등록
+from app.feature.airlines import airline_router
+from app.feature.flights import destination_router
+
+app.include_router(airline_router.router)
+app.include_router(destination_router.router)
+
+from app.feature.flights import flight_router
+app.include_router(flight_router.router)
+
+from app.feature.reviews import review_router
+app.include_router(review_router.router)
+
+from app.feature.notifications import notification_router
+app.include_router(notification_router.router)
+
+from app.feature.users import user_router
+app.include_router(user_router.router)
+
 
 # 6. 애플리케이션 생명주기 이벤트
 @app.on_event("startup")
