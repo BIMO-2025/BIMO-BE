@@ -6,8 +6,8 @@
 from typing import Optional, List, Dict, Any, Callable
 from datetime import datetime, timedelta
 
-from app.core.offline.local_db import LocalDatabase
-from app.core.offline.network_monitor import NetworkMonitor, get_network_monitor
+from app.feature.offline.local_db import LocalDatabase
+from app.core.network_monitor import NetworkMonitor, get_network_monitor
 from app.core.exceptions.exceptions import DatabaseError
 
 

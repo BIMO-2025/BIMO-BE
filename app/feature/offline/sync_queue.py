@@ -9,8 +9,8 @@ from typing import Optional, List, Dict, Any
 from datetime import datetime
 from enum import Enum
 
-from app.core.offline.local_db import LocalDatabase
-from app.core.offline.network_monitor import NetworkMonitor, get_network_monitor
+from app.feature.offline.local_db import LocalDatabase
+from app.core.network_monitor import NetworkMonitor, get_network_monitor
 from app.core.firebase import db
 from app.core.exceptions.exceptions import DatabaseError, CustomException
 
@@ -43,7 +43,7 @@ class SyncQueue:
     
     def _on_network_status_changed(self, status):
         """네트워크 상태 변경 시 자동 동기화 시작"""
-        from app.core.offline.network_monitor import NetworkStatus
+        from app.core.network_monitor import NetworkStatus
         if status == NetworkStatus.ONLINE:
             # 온라인 복구 시 자동으로 동기화 시작
             asyncio.create_task(self.sync_all())

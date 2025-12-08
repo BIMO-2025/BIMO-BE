@@ -1,7 +1,7 @@
 import firebase_admin
 from firebase_admin import auth, credentials, firestore
 
-from app.core.config import FIREBASE_KEY_PATH
+from app.core.config import settings
 from app.core.exceptions.exceptions import AppConfigError
 
 # 모듈 레벨에서 변수를 선언합니다.
@@ -11,7 +11,7 @@ db = None
 auth_client = None
 
 # 1. .env 설정 확인 (Fail Fast 1)
-if not FIREBASE_KEY_PATH:
+if not settings.FIREBASE_SERVICE_ACCOUNT_KEY:
     raise AppConfigError(
         "환경 변수 'FIREBASE_SERVICE_ACCOUNT_KEY'가 설정되지 않았습니다. .env 파일을 확인하세요."
     )
@@ -19,7 +19,7 @@ if not FIREBASE_KEY_PATH:
 try:
     # 2. 서비스 키 파일 유효성 검사 (Fail Fast 2)
     # FileNotFoundError, ValueError 등을 발생시킬 수 있습니다.
-    cred = credentials.Certificate(FIREBASE_KEY_PATH)
+    cred = credentials.Certificate(settings.FIREBASE_SERVICE_ACCOUNT_KEY)
 
     # 3. Firebase Admin SDK 초기화 (Fail Fast 3)
     # 이미 초기화되었으면 에러가 발생할 수 있습니다. (지금 구조에선 괜찮음)
@@ -38,7 +38,7 @@ except ValueError as e:
 except FileNotFoundError:
     # credentials.Certificate()가 실패한 경우 (파일 경로가 잘못됨)
     raise AppConfigError(
-        f"Firebase 서비스 키 파일을 찾을 수 없습니다. 경로를 확인하세요: {FIREBASE_KEY_PATH}"
+        f"Firebase 서비스 키 파일을 찾을 수 없습니다. 경로를 확인하세요: {settings.FIREBASE_SERVICE_ACCOUNT_KEY}"
     )
 except Exception as e:
     # initialize_app() 실패 등 기타 알 수 없는 오류

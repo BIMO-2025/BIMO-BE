@@ -1,35 +1,45 @@
 import os
+from typing import Optional
 
-from dotenv import load_dotenv
-
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from app.core.exceptions.exceptions import AppConfigError
 
-# .env 파일에서 환경 변수를 로드합니다.
-load_dotenv()
 
-# Firebase 설정
-FIREBASE_KEY_PATH = os.getenv("FIREBASE_SERVICE_ACCOUNT_KEY")
+class Settings(BaseSettings):
+    # Firebase 설정
+    FIREBASE_SERVICE_ACCOUNT_KEY: Optional[str] = None
 
-# API 자체 JWT 토큰 설정
-API_SECRET_KEY = os.getenv("API_SECRET_KEY")
-API_TOKEN_ALGORITHM = os.getenv("API_TOKEN_ALGORITHM", "HS256")
+    # API 자체 JWT 토큰 설정
+    API_SECRET_KEY: str
+    API_TOKEN_ALGORITHM: str = "HS256"
+    API_TOKEN_EXPIRE_MINUTES: int = 30
 
-_expire_raw = os.getenv("API_TOKEN_EXPIRE_MINUTES")
-try:
-    # 설정값이 없으면 기본값 30분을 사용하고,
-    # 값이 있으면 정수로 파싱합니다.
-    API_TOKEN_EXPIRE_MINUTES = int(_expire_raw) if _expire_raw is not None else 30
-except ValueError:
-    # 잘못된 값이 들어온 경우, 명확한 설정 오류로 앱 시작을 중단합니다.
-    raise AppConfigError(
-        "환경 변수 'API_TOKEN_EXPIRE_MINUTES'는 정수여야 합니다. 예: 30"
+    # LLM(Gemini) 설정
+    GEMINI_API_KEY: Optional[str] = None
+    GEMINI_MODEL_NAME: str = "gemini-1.5-flash"
+
+    # Amadeus API 설정
+    AMADEUS_API_KEY: Optional[str] = None
+    AMADEUS_API_SECRET: Optional[str] = None
+    AMADEUS_ENVIRONMENT: str = "test"
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore"  # 정의되지 않은 환경변수는 무시
     )
 
-# LLM(Gemini) 설정
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-GEMINI_MODEL_NAME = os.getenv("GEMINI_MODEL_NAME", "gemini-1.5-flash")
+try:
+    settings = Settings()
+except Exception as e:
+    raise AppConfigError(f"환경 변수 설정 오류: {e}")
 
-# Amadeus API 설정
-AMADEUS_API_KEY = os.getenv("AMADEUS_API_KEY")
-AMADEUS_API_SECRET = os.getenv("AMADEUS_API_SECRET")
-AMADEUS_ENVIRONMENT = os.getenv("AMADEUS_ENVIRONMENT", "test")  # "test" or "production"
+
+# 의존성 주입을 위한 설정 객체 반환 함수
+from functools import lru_cache
+
+@lru_cache()
+def get_settings() -> Settings:
+    return Settings()
+
+settings = get_settings()
