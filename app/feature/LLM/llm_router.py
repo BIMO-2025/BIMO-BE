@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.feature.LLM import llm_schemas, llm_service
+from app.feature.llm import llm_schemas, llm_service
 
 router = APIRouter(
     prefix="/llm",
