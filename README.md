@@ -26,6 +26,9 @@ API_TOKEN_EXPIRE_MINUTES=30
 # Gemini API 설정
 GEMINI_API_KEY=your-gemini-api-key-here
 GEMINI_MODEL_NAME=gemini-1.5-flash
+
+# Google OAuth 설정 (iOS)
+GOOGLE_IOS_CLIENT_ID=your-ios-client-id-here
 ```
 
 자세한 내용은 [환경 변수 가이드](docs/API_AUTH_USER_SCHEMAS.md)를 참고하세요.
