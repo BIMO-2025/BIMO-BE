@@ -190,3 +190,22 @@ class NetworkMonitor:
                     self._status = NetworkStatus.OFFLINE
                     self._notify_listeners(NetworkStatus.OFFLINE)
 
+
+# 싱글톤 인스턴스
+_network_monitor: Optional[NetworkMonitor] = None
+
+
+def get_network_monitor() -> NetworkMonitor:
+    """
+    네트워크 모니터 싱글톤 인스턴스를 반환합니다.
+    
+    Returns:
+        NetworkMonitor 인스턴스
+    """
+    global _network_monitor
+    if _network_monitor is None:
+        _network_monitor = NetworkMonitor()
+    return _network_monitor
+
+
+__all__ = ["NetworkMonitor", "NetworkStatus", "get_network_monitor"]
