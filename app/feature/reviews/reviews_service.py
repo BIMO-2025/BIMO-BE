@@ -2,12 +2,18 @@
 리뷰 관련 비즈니스 로직
 """
 
-from typing import List, Optional
+from typing import List, Optional, Tuple
+from datetime import datetime, timedelta, timezone
 from fastapi.concurrency import run_in_threadpool
 
 from app.core.firebase import db
-from app.feature.reviews.reviews_schemas import ReviewSchema
-from app.feature.LLM import llm_service
+from app.feature.reviews.reviews_schemas import (
+    ReviewSchema,
+    ReviewFilterRequest,
+    FilteredReviewsResponse,
+    DetailedReviewsResponse,
+)
+from app.feature.llm import llm_service
 from app.core.exceptions.exceptions import (
     DatabaseError,
     ReviewNotFoundError,
@@ -157,7 +163,7 @@ async def summarize_reviews(
         "Provide balanced insights highlighting both strengths and areas for improvement."
     )
     
-    from app.feature.LLM.llm_schemas import LLMChatRequest
+    from app.feature.llm.llm_schemas import LLMChatRequest
     request = LLMChatRequest(
         prompt=prompt,
         system_instruction=system_instruction
@@ -204,5 +210,260 @@ async def get_airline_reviews_summary(
         "summary": summary,
         "review_count": len(reviews)
     }
+
+
+def _parse_route(route: str) -> Tuple[Optional[str], Optional[str]]:
+    """
+    노선 문자열을 파싱하여 출발지와 도착지를 반환합니다.
+    
+    Args:
+        route: 노선 문자열 (예: "ICN-CDG", "인천-파리")
+        
+    Returns:
+        (출발지 코드, 도착지 코드) 튜플
+    """
+    if not route:
+        return None, None
+    
+    # "-" 또는 " - "로 분리
+    parts = route.replace(" ", "").split("-")
+    if len(parts) >= 2:
+        return parts[0].upper(), parts[1].upper()
+    return None, None
+
+
+def _matches_route_filter(review: ReviewSchema, departure: Optional[str], arrival: Optional[str]) -> bool:
+    """리뷰가 노선 필터 조건에 맞는지 확인"""
+    if not departure and not arrival:
+        return True
+    
+    review_dep, review_arr = _parse_route(review.route)
+    
+    if departure and review_dep != departure.upper():
+        return False
+    if arrival and review_arr != arrival.upper():
+        return False
+    
+    return True
+
+
+def _matches_seat_class_filter(review: ReviewSchema, seat_class: Optional[str]) -> bool:
+    """리뷰가 좌석 등급 필터 조건에 맞는지 확인"""
+    if not seat_class or seat_class == "전체":
+        return True
+    
+    if not review.seatClass:
+        return False
+    
+    # 좌석 등급 매칭 (대소문자 무시)
+    return review.seatClass.lower() == seat_class.lower()
+
+
+def _matches_period_filter(review: ReviewSchema, period: Optional[str]) -> bool:
+    """리뷰가 기간 필터 조건에 맞는지 확인"""
+    if not period or period == "전체":
+        return True
+    
+    now = datetime.now(timezone.utc)
+    review_date = review.createdAt
+    
+    if isinstance(review_date, str):
+        try:
+            review_date = datetime.fromisoformat(review_date.replace('Z', '+00:00'))
+        except (ValueError, AttributeError):
+            return True  # 파싱 실패 시 포함
+    
+    delta_map = {
+        "최근 3개월": timedelta(days=90),
+        "최근 6개월": timedelta(days=180),
+        "최근 1년": timedelta(days=365),
+    }
+    
+    delta = delta_map.get(period)
+    if not delta:
+        return True
+    
+    return (now - review_date) <= delta
+
+
+def _matches_rating_filter(review: ReviewSchema, min_rating: Optional[int]) -> bool:
+    """리뷰가 평점 필터 조건에 맞는지 확인"""
+    if min_rating is None:
+        return True
+    
+    return review.overallRating >= min_rating
+
+
+def _matches_photo_filter(review: ReviewSchema, photo_only: bool) -> bool:
+    """리뷰가 사진 필터 조건에 맞는지 확인"""
+    if not photo_only:
+        return True
+    
+    return review.imageUrl is not None and review.imageUrl != ""
+
+
+async def get_filtered_reviews(
+    airline_code: str,
+    filter_request: ReviewFilterRequest,
+    sort: str = "latest",
+    limit: int = 20,
+    offset: int = 0
+) -> FilteredReviewsResponse:
+    """
+    필터링 및 정렬된 리뷰를 조회합니다.
+    
+    Args:
+        airline_code: 항공사 코드
+        filter_request: 필터 조건
+        sort: 정렬 옵션 ("latest", "recommended", "rating_high", "rating_low", "likes_high")
+        limit: 조회할 리뷰 개수
+        offset: 오프셋
+        
+    Returns:
+        FilteredReviewsResponse
+    """
+    try:
+        # 1. 항공사 정보 조회
+        airline_doc = await run_in_threadpool(
+            lambda: airlines_collection.document(airline_code).get()
+        )
+        
+        if not airline_doc.exists:
+            raise DatabaseError(message=f"항공사를 찾을 수 없습니다: {airline_code}")
+        
+        airline_data = airline_doc.to_dict()
+        airline_name = airline_data.get("airlineName", airline_code)
+        
+        # 2. 모든 리뷰 조회
+        query = reviews_collection.where("airlineCode", "==", airline_code)
+        docs = await run_in_threadpool(lambda: list(query.stream()))
+        
+        # 3. ReviewSchema로 변환
+        all_reviews = []
+        for doc in docs:
+            try:
+                data = doc.to_dict()
+                data["id"] = doc.id
+                review = ReviewSchema(**data)
+                all_reviews.append(review)
+            except (ValueError, TypeError, KeyError) as e:
+                continue  # 스키마 변환 실패 시 스킵
+        
+        # 4. 필터링 적용
+        filtered_reviews = []
+        for review in all_reviews:
+            if not _matches_route_filter(review, filter_request.departure_airport, filter_request.arrival_airport):
+                continue
+            if not _matches_seat_class_filter(review, filter_request.seat_class):
+                continue
+            if not _matches_period_filter(review, filter_request.period):
+                continue
+            if not _matches_rating_filter(review, filter_request.min_rating):
+                continue
+            if not _matches_photo_filter(review, filter_request.photo_only):
+                continue
+            
+            filtered_reviews.append(review)
+        
+        # 5. 정렬 적용
+        if sort == "latest":
+            filtered_reviews.sort(key=lambda x: x.createdAt, reverse=True)
+        elif sort == "recommended" or sort == "likes_high":
+            filtered_reviews.sort(key=lambda x: x.likes, reverse=True)
+        elif sort == "rating_high":
+            filtered_reviews.sort(key=lambda x: x.overallRating, reverse=True)
+        elif sort == "rating_low":
+            filtered_reviews.sort(key=lambda x: x.overallRating)
+        
+        # 6. 페이지네이션 적용
+        total_count = len(filtered_reviews)
+        paginated_reviews = filtered_reviews[offset:offset + limit]
+        has_more = offset + limit < total_count
+        
+        return FilteredReviewsResponse(
+            airline_code=airline_code,
+            airline_name=airline_name,
+            total_count=total_count,
+            reviews=paginated_reviews,
+            has_more=has_more
+        )
+    except Exception as e:
+        if isinstance(e, CustomException):
+            raise e
+        raise DatabaseError(message=f"필터링된 리뷰 조회 중 오류 발생: {e}")
+
+
+async def get_detailed_reviews_page(
+    airline_code: str,
+    filter_request: Optional[ReviewFilterRequest] = None,
+    sort: str = "latest",
+    limit: int = 20,
+    offset: int = 0
+) -> DetailedReviewsResponse:
+    """
+    항공사 상세 리뷰 페이지 정보를 조회합니다 (필터링 및 정렬 지원).
+    
+    Args:
+        airline_code: 항공사 코드
+        filter_request: 필터 조건 (선택적)
+        sort: 정렬 옵션 ("latest", "recommended", "rating_high", "rating_low", "likes_high")
+        limit: 조회할 리뷰 개수
+        offset: 오프셋
+        
+    Returns:
+        DetailedReviewsResponse (사진 갤러리 포함)
+    """
+    try:
+        # 필터가 없으면 기본 필터 사용
+        if filter_request is None:
+            filter_request = ReviewFilterRequest()
+        
+        # 필터링된 리뷰 조회
+        filtered_response = await get_filtered_reviews(
+            airline_code=airline_code,
+            filter_request=filter_request,
+            sort=sort,
+            limit=limit,
+            offset=offset
+        )
+        
+        # 항공사 정보 및 평점 조회
+        airline_doc = await run_in_threadpool(
+            lambda: airlines_collection.document(airline_code).get()
+        )
+        
+        if not airline_doc.exists:
+            raise DatabaseError(message=f"항공사를 찾을 수 없습니다: {airline_code}")
+        
+        airline_data = airline_doc.to_dict()
+        airline_name = airline_data.get("airlineName", airline_code)
+        
+        # 평점 정보
+        avg_ratings = airline_data.get("averageRatings", {})
+        overall_rating = airline_data.get("overallRating", 0.0)
+        if not overall_rating and avg_ratings:
+            overall_rating = round(sum(avg_ratings.values()) / len(avg_ratings), 2)
+        
+        # 사진 리뷰 수집
+        photo_urls = []
+        for review in filtered_response.reviews:
+            if review.imageUrl:
+                photo_urls.append(review.imageUrl)
+        
+        return DetailedReviewsResponse(
+            airline_code=airline_code,
+            airline_name=airline_name,
+            overall_rating=overall_rating,
+            total_reviews=filtered_response.total_count,
+            average_ratings=avg_ratings,
+            photo_reviews=photo_urls,
+            photo_count=len(photo_urls),
+            reviews=filtered_response.reviews,
+            has_more=filtered_response.has_more
+        )
+    except Exception as e:
+        if isinstance(e, CustomException):
+            raise e
+        raise DatabaseError(message=f"상세 리뷰 페이지 조회 중 오류 발생: {e}")
 
 
