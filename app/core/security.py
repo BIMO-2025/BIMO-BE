@@ -4,11 +4,7 @@ from jose import JWTError, jwt
 from passlib.context import CryptContext
 
 # .env 파일에서 설정을 가져오기 위해 import
-from app.core.config import (
-    API_SECRET_KEY,
-    API_TOKEN_ALGORITHM,
-    API_TOKEN_EXPIRE_MINUTES
-)
+from app.core.config import settings
 # AppConfigError (시작 오류) 및 런타임 예외 임포트
 from app.core.exceptions.exceptions import (
     AppConfigError,
@@ -45,7 +41,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
         expire = datetime.now(timezone.utc) + expires_delta
     else:
         # .env에서 설정한 기본 만료 시간을 사용
-        expire = datetime.now(timezone.utc) + timedelta(minutes=API_TOKEN_EXPIRE_MINUTES)
+        expire = datetime.now(timezone.utc) + timedelta(minutes=settings.API_TOKEN_EXPIRE_MINUTES)
 
     # 토큰 발급 시간(iat)과 만료 시간(exp)을 payload에 추가
     to_encode.update({
@@ -54,14 +50,14 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     })
 
     # .env 파일에 키가 설정되었는지 확인
-    if not API_SECRET_KEY or not API_TOKEN_ALGORITHM:
+    if not settings.API_SECRET_KEY or not settings.API_TOKEN_ALGORITHM:
         # AppConfigError를 발생시켜 앱 시작을 중단
         raise AppConfigError(
             "JWT 설정(API_SECRET_KEY, API_TOKEN_ALGORITHM)이 필요합니다. .env 파일을 확인하세요."
         )
 
     # JWT 토큰 인코딩
-    encoded_jwt = jwt.encode(to_encode, API_SECRET_KEY, algorithm=API_TOKEN_ALGORITHM)
+    encoded_jwt = jwt.encode(to_encode, settings.API_SECRET_KEY, algorithm=settings.API_TOKEN_ALGORITHM)
 
     return encoded_jwt
 
@@ -77,7 +73,7 @@ def decode_access_token(token: str) -> dict:
     :raises InvalidTokenError: 토큰이 유효하지 않을 때 (서명, 형식 오류 등)
     """
     # JWT 설정값 확인
-    if not API_SECRET_KEY or not API_TOKEN_ALGORITHM:
+    if not settings.API_SECRET_KEY or not settings.API_TOKEN_ALGORITHM:
         raise AppConfigError(
             "JWT 설정(API_SECRET_KEY, API_TOKEN_ALGORITHM)이 필요합니다. .env 파일을 확인하세요."
         )
@@ -86,8 +82,8 @@ def decode_access_token(token: str) -> dict:
         # JWT 디코딩 시도
         payload = jwt.decode(
             token,
-            API_SECRET_KEY,
-            algorithms=[API_TOKEN_ALGORITHM]
+            settings.API_SECRET_KEY,
+            algorithms=[settings.API_TOKEN_ALGORITHM]
         )
         # payload에서 'sub' (사용자 ID) 값을 추출할 수 있습니다.
         # uid = payload.get("sub")
@@ -101,3 +97,31 @@ def decode_access_token(token: str) -> dict:
     except Exception:
         # 예상치 못한 기타 오류
         raise InvalidTokenError(message="토큰 디코딩 중 알 수 없는 오류가 발생했습니다.")
+
+
+def verify_firebase_token(token: str) -> dict:
+    """
+    Firebase ID Token을 검증합니다.
+    
+    Args:
+        token: Firebase ID Token 문자열
+        
+    Returns:
+        디코딩된 토큰 정보 (uid, email 등 포함)
+        
+    Raises:
+        InvalidTokenError: 토큰이 유효하지 않을 때
+        TokenExpiredError: 토큰이 만료되었을 때
+    """
+    from firebase_admin import auth as firebase_auth
+    from app.core.firebase import auth_client
+    
+    try:
+        decoded_token = auth_client.verify_id_token(token)
+        return decoded_token
+    except firebase_auth.ExpiredIdTokenError:
+        raise TokenExpiredError()
+    except firebase_auth.InvalidIdTokenError:
+        raise InvalidTokenError()
+    except Exception as e:
+        raise InvalidTokenError(message=f"Firebase 토큰 검증 중 오류 발생: {e}")

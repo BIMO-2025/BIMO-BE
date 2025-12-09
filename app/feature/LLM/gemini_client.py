@@ -3,7 +3,7 @@ from typing import List
 
 from fastapi.concurrency import run_in_threadpool
 
-from app.core.config import GEMINI_API_KEY, GEMINI_MODEL_NAME
+from app.core.config import settings
 from app.core.exceptions.exceptions import AppConfigError, ExternalApiError
 
 
@@ -14,9 +14,13 @@ class GeminiClient:
 
     def __init__(
         self,
-        api_key: str | None = GEMINI_API_KEY,
-        model_name: str | None = GEMINI_MODEL_NAME,
+        api_key: str | None = None,
+        model_name: str | None = None,
     ) -> None:
+        if api_key is None:
+            api_key = settings.GEMINI_API_KEY
+        if model_name is None:
+            model_name = settings.GEMINI_MODEL_NAME
         self._genai = self._import_sdk()
         self._configure(api_key)
         self.model_name = model_name or "gemini-1.5-flash"

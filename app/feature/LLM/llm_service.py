@@ -1,6 +1,6 @@
-from app.feature.LLM.gemini_client import gemini_client
-from app.feature.LLM.llm_schemas import LLMChatRequest
-from app.feature.LLM.prompt_builder import (
+from app.feature.llm.gemini_client import gemini_client
+from app.feature.llm.llm_schemas import LLMChatRequest
+from app.feature.llm.prompt_builder import (
     DEFAULT_SYSTEM_INSTRUCTION,
     build_prompt_segments,
 )

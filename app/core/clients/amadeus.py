@@ -2,7 +2,7 @@ from typing import Optional
 
 from fastapi.concurrency import run_in_threadpool
 
-from app.core.config import AMADEUS_API_KEY, AMADEUS_API_SECRET, AMADEUS_ENVIRONMENT
+from app.core.config import settings
 from app.core.exceptions.exceptions import AppConfigError, ExternalApiError
 
 
@@ -13,10 +13,16 @@ class AmadeusClient:
 
     def __init__(
         self,
-        api_key: str | None = AMADEUS_API_KEY,
-        api_secret: str | None = AMADEUS_API_SECRET,
-        environment: str | None = AMADEUS_ENVIRONMENT,
+        api_key: str | None = None,
+        api_secret: str | None = None,
+        environment: str | None = None,
     ) -> None:
+        if api_key is None:
+            api_key = settings.AMADEUS_API_KEY
+        if api_secret is None:
+            api_secret = settings.AMADEUS_API_SECRET
+        if environment is None:
+            environment = settings.AMADEUS_ENVIRONMENT
         self._import_sdk()
         self._configure(api_key, api_secret, environment)
 

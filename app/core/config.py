@@ -23,6 +23,9 @@ class Settings(BaseSettings):
     AMADEUS_API_SECRET: Optional[str] = None
     AMADEUS_ENVIRONMENT: str = "test"
 
+    # Google OAuth 설정 (iOS)
+    GOOGLE_IOS_CLIENT_ID: Optional[str] = None
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

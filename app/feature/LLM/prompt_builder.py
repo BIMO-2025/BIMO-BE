@@ -1,6 +1,6 @@
 from typing import List, Optional
 
-from app.feature.LLM.llm_schemas import FlightInfo, ImageAttachment
+from app.feature.llm.llm_schemas import FlightInfo, ImageAttachment
 
 DEFAULT_SYSTEM_INSTRUCTION = (
     "You are an airline experience concierge. "
