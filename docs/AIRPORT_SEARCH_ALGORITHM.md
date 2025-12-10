@@ -214,3 +214,6 @@ GET /destinations/search?query=ICN
 → 인천국제공항 (ICN)
 ```
 
+
+
+
