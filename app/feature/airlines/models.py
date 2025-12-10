@@ -13,6 +13,7 @@ class Airline(BaseModel):
     rating: float = Field(0.0, description="평점")
     review_count: int = Field(0, description="리뷰 수")
     logo_url: Optional[str] = Field(None, description="로고 이미지 URL")
+    rank: Optional[int] = Field(None, description="순위 (인기 차트 등에서 사용)")
 
 
 class AirlineDetail(Airline):
@@ -40,4 +41,7 @@ class Airport(BaseModel):
     name: str = Field(..., description="공항 이름")
     city: str = Field(..., description="도시")
     country: str = Field(..., description="국가")
+
+
+
 
