@@ -400,3 +400,6 @@ service cloud.firestore {
 2. 기존 `reviews` 데이터 기반으로 집계 재계산
 3. Cloud Function 배포 후 테스트
 
+
+
+

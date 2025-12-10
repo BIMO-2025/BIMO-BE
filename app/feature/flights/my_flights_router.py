@@ -140,3 +140,6 @@ async def delete_my_flight(
         raise HTTPException(status_code=404, detail="비행 기록을 찾을 수 없습니다.")
     return {"message": "비행 기록이 삭제되었습니다."}
 
+
+
+
