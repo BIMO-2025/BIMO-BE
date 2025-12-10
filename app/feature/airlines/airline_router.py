@@ -3,13 +3,16 @@
 """
 
 from typing import List
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 
-from app.feature.airlines import airline_service
+from app.core.deps import get_firebase_service
+from app.core.firebase import FirebaseService
+from app.feature.airlines.airline_service import AirlineService
 from app.feature.airlines.models import Airline, AirlineDetail
 from app.feature.flights.flights_schemas import AirlineSchema
 from app.feature.reviews.reviews_schemas import AirlineReviewsResponse, BIMOSummaryResponse
-from fastapi import Query
+from app.feature.reviews.reviews_router import get_reviews_service
+from app.feature.reviews.reviews_service import ReviewsService
 
 router = APIRouter(
     prefix="/airlines",
@@ -18,9 +21,11 @@ router = APIRouter(
 )
 
 
-def get_airline_service():
-    """의존성 주입용"""
-    return airline_service
+def get_airline_service(
+    firebase_service: FirebaseService = Depends(get_firebase_service)
+) -> AirlineService:
+    """AirlineService 의존성 주입"""
+    return AirlineService(firebase_service=firebase_service)
 
 
 @router.get("/search", response_model=List[Airline])
@@ -112,7 +117,8 @@ async def get_airline_reviews_page(
     airline_code: str,
     sort: str = Query("latest", description="정렬 옵션: latest, recommended, rating_high, rating_low"),
     limit: int = Query(20, ge=1, le=100, description="조회할 리뷰 개수"),
-    offset: int = Query(0, ge=0, description="오프셋")
+    offset: int = Query(0, ge=0, description="오프셋"),
+    reviews_service: ReviewsService = Depends(get_reviews_service)
 ):
     """
     항공사 리뷰 페이지 정보를 조회합니다.
@@ -124,7 +130,6 @@ async def get_airline_reviews_page(
     
     평점 정보와 리뷰 목록을 반환합니다.
     """
-    from app.feature.reviews import reviews_service
     return await reviews_service.get_airline_reviews_page(
         airline_code=airline_code,
         sort=sort,
@@ -134,7 +139,10 @@ async def get_airline_reviews_page(
 
 
 @router.get("/{airline_code}/summary", response_model=BIMOSummaryResponse)
-async def get_bimo_summary(airline_code: str):
+async def get_bimo_summary(
+    airline_code: str,
+    reviews_service: ReviewsService = Depends(get_reviews_service)
+):
     """
     BIMO 요약 정보를 조회합니다 (LLM 기반).
     Good/Bad 포인트를 분리하여 반환합니다.
@@ -143,6 +151,5 @@ async def get_bimo_summary(airline_code: str):
     
     평점 관련 요청과 별도로 호출됩니다.
     """
-    from app.feature.reviews import reviews_service
     return await reviews_service.generate_bimo_summary(airline_code)
 

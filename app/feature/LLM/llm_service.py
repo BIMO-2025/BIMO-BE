@@ -1,11 +1,9 @@
-from app.feature.llm.gemini_client import gemini_client
+from app.feature.llm.gemini_client import get_gemini_client
 from app.feature.llm.llm_schemas import LLMChatRequest
 from app.feature.llm.prompt_builder import (
     DEFAULT_SYSTEM_INSTRUCTION,
     build_prompt_segments,
 )
-
-MODEL_NAME = gemini_client.model_name
 
 
 async def generate_chat_completion(request: LLMChatRequest) -> str:
@@ -20,9 +18,11 @@ async def generate_chat_completion(request: LLMChatRequest) -> str:
         flight_info=request.flight_info,
         images=request.images,
     )
+    
+    # Gemini 클라이언트 가져오기
+    client = get_gemini_client()
 
-    return await gemini_client.generate(
+    return await client.generate(
         prompt_segments=prompt_segments,
         system_instruction=system_instruction,
     )
-

@@ -199,7 +199,31 @@ class AmadeusClient:
             ) from exc
 
 
-amadeus_client = AmadeusClient()
+# =============================================================================
+# 하위 호환성을 위한 모듈 레벨 변수 (deprecated)
+# 새로운 코드에서는 AmadeusClient를 직접 인스턴스화하거나 DI를 사용하세요.
+# =============================================================================
 
-__all__ = ["AmadeusClient", "amadeus_client"]
+# Lazy initialization을 위한 변수
+_amadeus_client = None
+
+
+def get_amadeus_client() -> AmadeusClient:
+    """
+    Amadeus 클라이언트 인스턴스를 반환합니다.
+    
+    Returns:
+        AmadeusClient 인스턴스
+    """
+    global _amadeus_client
+    if _amadeus_client is None:
+        _amadeus_client = AmadeusClient()
+    return _amadeus_client
+
+
+# 하위 호환성을 위해: 모듈 import 시 자동 초기화하지 않음
+# 대신 필요할 때 get_amadeus_client() 호출
+amadeus_client = None  # deprecated: get_amadeus_client()를 사용하세요
+
+__all__ = ["AmadeusClient", "get_amadeus_client", "amadeus_client"]
 

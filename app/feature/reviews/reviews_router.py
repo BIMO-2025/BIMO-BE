@@ -2,10 +2,14 @@
 리뷰 관련 API 라우터
 """
 
-from fastapi import APIRouter, Query, HTTPException
+from fastapi import APIRouter, Query, HTTPException, Depends
 from typing import Optional
 
-from app.feature.reviews import reviews_schemas, reviews_service
+from app.core.deps import get_firebase_service, get_gemini_client
+from app.core.firebase import FirebaseService
+from app.feature.llm.gemini_client import GeminiClient
+from app.feature.reviews.reviews_service import ReviewsService
+from app.feature.reviews import reviews_schemas
 
 router = APIRouter(
     prefix="/reviews",
@@ -14,10 +18,22 @@ router = APIRouter(
 )
 
 
+def get_reviews_service(
+    firebase_service: FirebaseService = Depends(get_firebase_service),
+    gemini_client: GeminiClient = Depends(get_gemini_client)
+) -> ReviewsService:
+    """ReviewsService 의존성 주입"""
+    return ReviewsService(
+        firebase_service=firebase_service,
+        gemini_client=gemini_client
+    )
+
+
 @router.get("/airline/{airline_code}", response_model=list[reviews_schemas.ReviewSchema])
 async def get_airline_reviews(
     airline_code: str,
-    limit: int = Query(10, ge=1, le=100, description="조회할 리뷰 개수")
+    limit: int = Query(10, ge=1, le=100, description="조회할 리뷰 개수"),
+    service: ReviewsService = Depends(get_reviews_service)
 ):
     """
     항공사 코드로 리뷰 목록을 조회합니다.
@@ -25,22 +41,26 @@ async def get_airline_reviews(
     - **airline_code**: 항공사 코드 (예: KE, OZ)
     - **limit**: 조회할 리뷰 개수 (기본값: 10, 최대: 100)
     """
-    return await reviews_service.get_reviews_by_airline(airline_code, limit=limit)
+    return await service.get_reviews_by_airline(airline_code, limit=limit)
 
 
 @router.get("/{review_id}", response_model=reviews_schemas.ReviewSchema)
-async def get_review(review_id: str):
+async def get_review(
+    review_id: str,
+    service: ReviewsService = Depends(get_reviews_service)
+):
     """
     리뷰 ID로 특정 리뷰를 조회합니다.
     
     - **review_id**: 리뷰 ID
     """
-    return await reviews_service.get_review_by_id(review_id)
+    return await service.get_review_by_id(review_id)
 
 
 @router.post("/summarize", response_model=reviews_schemas.ReviewSummaryResponse)
 async def summarize_airline_reviews(
-    request: reviews_schemas.ReviewSummaryRequest
+    request: reviews_schemas.ReviewSummaryRequest,
+    service: ReviewsService = Depends(get_reviews_service)
 ):
     """
     LLM을 사용하여 항공사 리뷰를 요약합니다.
@@ -51,7 +71,7 @@ async def summarize_airline_reviews(
     
     LLM이 리뷰들을 분석하여 전체적인 평가, 장점, 단점, 추천 대상을 요약합니다.
     """
-    return await reviews_service.get_airline_reviews_summary(
+    return await service.get_airline_reviews_summary(
         airline_code=request.airline_code,
         airline_name=request.airline_name
     )
@@ -70,7 +90,8 @@ async def get_detailed_reviews(
     # 정렬 및 페이지네이션
     sort: str = Query("latest", description="정렬 옵션: latest, recommended, rating_high, rating_low, likes_high"),
     limit: int = Query(20, ge=1, le=100, description="조회할 리뷰 개수"),
-    offset: int = Query(0, ge=0, description="오프셋")
+    offset: int = Query(0, ge=0, description="오프셋"),
+    service: ReviewsService = Depends(get_reviews_service)
 ):
     """
     항공사 상세 리뷰 페이지 정보를 조회합니다 (필터링 및 정렬 지원).
@@ -106,7 +127,7 @@ async def get_detailed_reviews(
             photo_only=photo_only
         )
         
-        return await reviews_service.get_detailed_reviews_page(
+        return await service.get_detailed_reviews_page(
             airline_code=airline_code,
             filter_request=filter_request,
             sort=sort,
@@ -123,7 +144,8 @@ async def get_filtered_reviews(
     filter_request: reviews_schemas.ReviewFilterRequest,
     sort: str = Query("latest", description="정렬 옵션: latest, recommended, rating_high, rating_low, likes_high"),
     limit: int = Query(20, ge=1, le=100, description="조회할 리뷰 개수"),
-    offset: int = Query(0, ge=0, description="오프셋")
+    offset: int = Query(0, ge=0, description="오프셋"),
+    service: ReviewsService = Depends(get_reviews_service)
 ):
     """
     필터링 및 정렬된 리뷰를 조회합니다 (POST 방식).
@@ -131,7 +153,7 @@ async def get_filtered_reviews(
     필터 조건을 Request Body로 전달할 수 있습니다.
     """
     try:
-        return await reviews_service.get_filtered_reviews(
+        return await service.get_filtered_reviews(
             airline_code=airline_code,
             filter_request=filter_request,
             sort=sort,
@@ -140,5 +162,3 @@ async def get_filtered_reviews(
         )
     except Exception as e:
         raise HTTPException(status_code=404, detail=str(e))
-
-
