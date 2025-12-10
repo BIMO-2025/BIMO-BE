@@ -123,10 +123,12 @@ class SegmentSchema(BaseModel):
     """
     departure: Dict = Field(..., description="출발 정보 (공항 코드, 시간 등)")
     arrival: Dict = Field(..., description="도착 정보 (공항 코드, 시간 등)")
-    carrier_code: str = Field(..., description="항공사 코드")
+    carrier_code: str = Field(..., alias="carrierCode", description="항공사 코드")
     number: str = Field(..., description="항공편 번호")
     aircraft: Optional[Dict] = Field(None, description="항공기 정보")
     duration: Optional[str] = Field(None, description="비행 시간")
+
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class ItinerarySchema(BaseModel):
@@ -136,6 +138,8 @@ class ItinerarySchema(BaseModel):
     duration: str = Field(..., description="전체 여정 시간")
     segments: List[SegmentSchema] = Field(..., description="구간 정보 리스트")
 
+    model_config = ConfigDict(populate_by_name=True)
+
 
 class FlightOfferSchema(BaseModel):
     """
@@ -143,13 +147,14 @@ class FlightOfferSchema(BaseModel):
     """
     id: str = Field(..., description="항공편 제안 ID")
     source: str = Field(..., description="데이터 소스")
-    instant_ticketing_required: bool = Field(False, description="즉시 발권 필요 여부")
-    non_homogeneous: bool = Field(False, description="동일 항공사 여부")
-    one_way: bool = Field(False, description="편도 여부")
-    last_ticketing_date: Optional[str] = Field(None, description="마지막 발권일")
-    number_of_bookable_seats: Optional[int] = Field(None, description="예약 가능한 좌석 수")
+    instant_ticketing_required: bool = Field(False, alias="instantTicketingRequired", description="즉시 발권 필요 여부")
+    non_homogeneous: bool = Field(False, alias="nonHomogeneous", description="동일 항공사 여부")
+    one_way: bool = Field(False, alias="oneWay", description="편도 여부")
+    last_ticketing_date: Optional[str] = Field(None, alias="lastTicketingDate", description="마지막 발권일")
+    number_of_bookable_seats: Optional[int] = Field(None, alias="numberOfBookableSeats", description="예약 가능한 좌석 수")
     itineraries: List[ItinerarySchema] = Field(..., description="여정 정보 리스트")
     price: PriceSchema = Field(..., description="가격 정보")
+
     validating_airline_codes: List[str] = Field(default_factory=list, description="유효한 항공사 코드 리스트")
     traveler_pricings: Optional[List[Dict]] = Field(None, description="승객별 가격 정보")
     
@@ -158,8 +163,11 @@ class FlightOfferSchema(BaseModel):
     is_direct: bool = Field(False, description="직항 여부")
     stopover_info: Optional[str] = Field(None, description="경유 정보 (예: '직항', '1회 경유')")
 
+
+
     model_config = ConfigDict(
         from_attributes=True,
+        populate_by_name=True,
         json_schema_extra={
             "example": {
                 "id": "1",

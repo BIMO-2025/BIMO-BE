@@ -76,7 +76,11 @@ async def search_flights(request: FlightSearchRequest) -> FlightSearchResponse:
                 
                 flight_offers.append(flight_offer)
             except Exception as e:
+
                 parsing_failed_count += 1
+
+
+
                 continue
 
         # 3. 항공사 추가 정보(평점, 리뷰 등) 조회 및 매핑
