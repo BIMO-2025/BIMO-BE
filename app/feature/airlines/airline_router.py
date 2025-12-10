@@ -49,6 +49,25 @@ async def get_popular_airlines(
     return await service.get_popular_airlines(limit)
 
 
+@router.get("/popular/weekly", response_model=List[Airline])
+async def get_popular_airlines_weekly(
+    year: int,
+    month: int,
+    week: int,
+    limit: int = 5,
+    service = Depends(get_airline_service)
+):
+    """
+    특정 연/월/주차 기준 인기 항공사를 조회합니다.
+    
+    - **year**: 연도 (예: 2025)
+    - **month**: 월 (1-12)
+    - **week**: 주차 (1주차=1~7일, 2주차=8~14일 ...)
+    - **limit**: 조회할 개수 (기본값: 5)
+    """
+    return await service.get_popular_airlines_weekly(year, month, week, limit)
+
+
 @router.get("/{airline_code}", response_model=AirlineSchema)
 async def get_airline_detail(
     airline_code: str,

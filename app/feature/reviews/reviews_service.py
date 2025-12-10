@@ -2,6 +2,7 @@
 리뷰 관련 비즈니스 로직
 """
 
+import json
 from typing import List, Optional, Tuple
 from datetime import datetime, timedelta, timezone
 from fastapi.concurrency import run_in_threadpool
@@ -12,6 +13,7 @@ from app.feature.reviews.reviews_schemas import (
     ReviewFilterRequest,
     FilteredReviewsResponse,
     DetailedReviewsResponse,
+    BIMOSummaryResponse,
 )
 from app.feature.llm import llm_service
 from app.core.exceptions.exceptions import (
@@ -257,6 +259,73 @@ def _matches_seat_class_filter(review: ReviewSchema, seat_class: Optional[str]) 
     
     # 좌석 등급 매칭 (대소문자 무시)
     return review.seatClass.lower() == seat_class.lower()
+
+
+async def generate_bimo_summary(airline_code: str) -> BIMOSummaryResponse:
+    """
+    LLM을 사용해 Good/Bad 포인트를 JSON 형태로 추출합니다.
+    실패 시 빈 리스트를 반환하여 프런트가 우회 표시 가능.
+    """
+    # 최근 리뷰 최대 50개 사용
+    reviews = await get_reviews_by_airline(airline_code, limit=50)
+    if not reviews:
+        return BIMOSummaryResponse(
+            airline_code=airline_code,
+            airline_name=airline_code,
+            good_points=[],
+            bad_points=[],
+            review_count=0,
+        )
+
+    airline_name = reviews[0].airlineName if getattr(reviews[0], "airlineName", None) else airline_code
+
+    review_lines = []
+    for r in reviews:
+        text = r.text or ""
+        review_lines.append(f"- {text} (평점: {r.overallRating}/5)")
+
+    prompt = f"""
+다음은 {airline_name} 항공사에 대한 리뷰 {len(reviews)}개의 목록입니다.
+각 리뷰는 텍스트와 평점을 포함합니다.
+
+리뷰 목록:
+{chr(10).join(review_lines[:50])}
+
+요구사항:
+- 한국어로 응답합니다.
+- JSON 문자열만 반환합니다 (설명 금지).
+- 형태: {{"good_points": ["..."], "bad_points": ["..."]}}
+- good/bad 각각 최대 5개, 짧고 핵심만.
+"""
+
+    system_instruction = (
+        "You are an airline review analyst. Return concise JSON with good_points and bad_points in Korean."
+    )
+
+    from app.feature.llm.llm_schemas import LLMChatRequest
+    request = LLMChatRequest(prompt=prompt, system_instruction=system_instruction)
+
+    raw = await llm_service.generate_chat_completion(request)
+
+    def _safe_parse(raw_text: str) -> tuple[list[str], list[str]]:
+        try:
+            data = json.loads(raw_text.strip())
+            good = data.get("good_points") or []
+            bad = data.get("bad_points") or []
+            return list(good), list(bad)
+        except Exception:
+            # 간단한 fallback: 줄바꿈 기준으로 good/bad 추정하지 않고 빈 리스트로 처리
+            return [], []
+
+    good_points, bad_points = _safe_parse(raw)
+
+    return BIMOSummaryResponse(
+        airline_code=airline_code,
+        airline_name=airline_name,
+        good_points=good_points,
+        bad_points=bad_points,
+        review_count=len(reviews),
+    )
 
 
 def _matches_period_filter(review: ReviewSchema, period: Optional[str]) -> bool:

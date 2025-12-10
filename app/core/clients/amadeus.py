@@ -143,6 +143,61 @@ class AmadeusClient:
                 detail=f"항공편 검색 중 오류가 발생했습니다: {error_message}",
             ) from exc
 
+    async def search_locations(
+        self,
+        keyword: str,
+        sub_type: list[str] = ["AIRPORT", "CITY"]
+    ) -> list[dict]:
+        """
+        키워드로 공항 및 도시를 검색합니다.
+        
+        Args:
+            keyword: 검색 키워드 (예: "Seoul", "JFK")
+            sub_type: 검색 대상 유형 리스트 (기본값: ["AIRPORT", "CITY"])
+            
+        Returns:
+            검색된 위치 정보 리스트
+            
+        Raises:
+            ExternalApiError: Amadeus API 호출 중 오류 발생 시
+        """
+        try:
+            def _search():
+                try:
+                    response = self.client.reference_data.locations.get(
+                        keyword=keyword,
+                        subType=",".join(sub_type)
+                    )
+                    
+                    if hasattr(response, "data"):
+                        return response.data
+                    elif isinstance(response, dict) and "data" in response:
+                        return response["data"]
+                    else:
+                        return response
+                except Exception as api_exc:
+                     # Amadeus SDK의 ResponseError 등 상세 에러 정보 추출
+                    error_details = str(api_exc)
+                    if hasattr(api_exc, "response"):
+                        if hasattr(api_exc.response, "body"):
+                            error_details += f" | Response: {api_exc.response.body}"
+                        if hasattr(api_exc.response, "status_code"):
+                            error_details += f" | Status: {api_exc.response.status_code}"
+                    if hasattr(api_exc, "description"):
+                        error_details += f" | Description: {api_exc.description}"
+                    raise Exception(error_details) from api_exc
+
+            response = await run_in_threadpool(_search)
+            return response if isinstance(response, list) else []
+
+        except ExternalApiError:
+            raise
+        except Exception as exc:
+            raise ExternalApiError(
+                provider="Amadeus",
+                detail=f"위치 검색 중 오류가 발생했습니다: {str(exc)}",
+            ) from exc
+
 
 amadeus_client = AmadeusClient()
 

@@ -27,3 +27,13 @@ async def search_flights(request: flights_schemas.FlightSearchRequest):
     """
     return await flights_service.search_flights(request)
 
+@router.get("/locations", response_model=flights_schemas.LocationSearchResponse)
+async def search_locations(keyword: str):
+    """
+    키워드로 공항 및 도시를 검색합니다.
+    
+    - **keyword**: 검색어 (예: "Seoul", "JFK", "London")
+    
+    도시와 공항 정보를 모두 반환합니다.
+    """
+    return await flights_service.search_locations(keyword)

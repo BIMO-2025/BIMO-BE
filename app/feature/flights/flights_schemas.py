@@ -34,10 +34,21 @@ class AirlineSchema(BaseModel):
     경로: airlines/{airlineCode}
     """
     airlineName: str
+    logoUrl: Optional[str] = None
     totalReviews: int = 0
     totalRatingSums: Dict[str, int] = Field(default_factory=dict)
     averageRatings: Dict[str, float] = Field(default_factory=dict)
     ratingBreakdown: Dict[str, Dict[str, int]] = Field(default_factory=dict)
+    overallRating: float = 0.0
+    # 확장 필드 (상세 화면용)
+    alliance: Optional[str] = Field(None, description="항공 동맹 (예: SkyTeam)")
+    type: str = Field("FSC", description="FSC 또는 LCC")
+    country: Optional[str] = Field(None, description="소속 국가")
+    hubAirport: Optional[str] = Field(None, description="허브 공항 코드")
+    hubAirportName: Optional[str] = Field(None, description="허브 공항 이름")
+    operatingClasses: List[str] = Field(default_factory=list, description="운항 클래스 목록")
+    images: List[str] = Field(default_factory=list, description="대표/갤러리 이미지 URL 리스트")
+    description: Optional[str] = Field(None, description="항공사 설명")
 
     model_config = ConfigDict(
         from_attributes=True,
@@ -81,6 +92,9 @@ class FlightSearchRequest(BaseModel):
     destination: str = Field(..., description="도착지 공항 코드 (예: ICN, JFK)", min_length=3, max_length=3)
     departure_date: str = Field(..., description="출발 날짜 (YYYY-MM-DD 형식)", pattern=r"^\d{4}-\d{2}-\d{2}$")
     adults: int = Field(1, description="성인 승객 수", ge=1, le=9)
+    sort_by: Optional[Literal["rating_desc", "review_count_desc", "price_asc"]] = Field(
+        None, description="정렬 기준 (평점순: rating_desc, 리뷰많은순: review_count_desc, 가격순: price_asc)"
+    )
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -140,8 +154,16 @@ class FlightOfferSchema(BaseModel):
     number_of_bookable_seats: Optional[int] = Field(None, alias="numberOfBookableSeats", description="예약 가능한 좌석 수")
     itineraries: List[ItinerarySchema] = Field(..., description="여정 정보 리스트")
     price: PriceSchema = Field(..., description="가격 정보")
-    validating_airline_codes: List[str] = Field(default_factory=list, alias="validatingAirlineCodes", description="유효한 항공사 코드 리스트")
-    traveler_pricings: Optional[List[Dict]] = Field(None, alias="travelerPricings", description="승객별 가격 정보")
+
+    validating_airline_codes: List[str] = Field(default_factory=list, description="유효한 항공사 코드 리스트")
+    traveler_pricings: Optional[List[Dict]] = Field(None, description="승객별 가격 정보")
+    
+    # 추가된 필드
+    airline_info: Optional[AirlineSchema] = Field(None, description="항공사 상세 정보 (평점, 리뷰 등)")
+    is_direct: bool = Field(False, description="직항 여부")
+    stopover_info: Optional[str] = Field(None, description="경유 정보 (예: '직항', '1회 경유')")
+
+
 
     model_config = ConfigDict(
         from_attributes=True,
@@ -192,6 +214,67 @@ class FlightSearchResponse(BaseModel):
             "example": {
                 "flight_offers": [],
                 "count": 0
+            }
+        }
+    )
+
+
+class LocationSchema(BaseModel):
+    """
+    공항 및 도시 정보 스키마
+    """
+    id: Optional[str] = Field(None, description="위치 ID")
+    name: str = Field(..., description="위치 이름 (예: Incheon International Airport)")
+    detailed_name: Optional[str] = Field(None, description="상세 이름 (예: SEOUL/ICN)")
+    iata_code: str = Field(..., description="IATA 코드 (예: ICN)")
+    geo_code: Optional[Dict] = Field(None, description="위도/경도 정보")
+    address: Optional[Dict] = Field(None, description="주소 정보 (국가, 도시 등)")
+    sub_type: str = Field(..., description="위치 유형 (AIRPORT, CITY)")
+    
+    model_config = ConfigDict(
+        from_attributes=True,
+        json_schema_extra={
+            "example": {
+                "id": "AKL",
+                "name": "AUCKLAND INTL",
+                "detailed_name": "AUCKLAND/NZ",
+                "iata_code": "AKL",
+                "sub_type": "AIRPORT",
+                "address": {
+                    "cityName": "AUCKLAND",
+                    "cityCode": "AKL",
+                    "countryName": "NEW ZEALAND",
+                    "countryCode": "NZ",
+                    "regionCode": "OCEANIA"
+                }
+            }
+        }
+    )
+
+
+class LocationSearchResponse(BaseModel):
+    """
+    위치 검색 응답 스키마
+    """
+    locations: List[LocationSchema] = Field(..., description="검색된 위치 목록")
+    count: int = Field(..., description="검색된 위치 개수")
+    
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "locations": [
+                    {
+                        "name": "INCHEON INTL",
+                        "iata_code": "ICN",
+                        "sub_type": "AIRPORT"
+                    },
+                    {
+                        "name": "SEOUL",
+                        "iata_code": "SEL",
+                        "sub_type": "CITY"
+                    }
+                ],
+                "count": 2
             }
         }
     )
