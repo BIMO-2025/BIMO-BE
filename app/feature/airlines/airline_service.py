@@ -3,7 +3,8 @@
 경로: airlines/{airlineCode}
 """
 
-from typing import List, Optional
+from datetime import datetime, timedelta, timezone
+from typing import Dict, List, Optional
 from fastapi.concurrency import run_in_threadpool
 
 from app.core.firebase import db
@@ -13,6 +14,7 @@ from app.core.exceptions.exceptions import DatabaseError, CustomException
 
 # Firestore 컬렉션 참조
 airlines_collection = db.collection("airlines")
+reviews_collection = db.collection("reviews")
 
 
 async def search_airlines(query: str) -> List[Airline]:
@@ -59,18 +61,30 @@ async def search_airlines(query: str) -> List[Airline]:
 
 
 async def get_popular_airlines(limit: int = 5) -> List[Airline]:
-    """인기 항공사 조회 (평점 높은 순)"""
+    """
+    인기 항공사 조회 (Weighted Rating 기준)
+    
+    IMDB 공식 사용:
+    WR = (v / (v+m)) * R + (m / (v+m)) * C
+    - v: 해당 항공사의 총 리뷰 수
+    - m: 순위에 들기 위한 최소 리뷰 수 (여기서는 10으로 설정)
+    - R: 해당 항공사의 평균 평점
+    - C: 전체 리포트의 평균 평점
+    """
     try:
-        # AirlineSchema 기반으로 조회 (totalReviews가 많은 순)
-        query = airlines_collection.order_by(
-            "totalReviews", direction="DESCENDING"
-        ).limit(limit)
+        # 모든 항공사 조회 (통계 계산을 위해)
+        docs = await run_in_threadpool(lambda: list(airlines_collection.stream()))
         
-        docs = await run_in_threadpool(lambda: list(query.stream()))
+        all_airlines = []
+        total_rating_sum = 0
+        count_for_mean = 0
         
-        results = []
+        # 1. 데이터 수집 및 평균 계산 준비
         for doc in docs:
             data = doc.to_dict()
+            rating = data.get("averageRatings", {}).get("overall", 0.0)
+            review_count = data.get("totalReviews", 0)
+            
             # AirlineSchema를 Airline 모델로 변환
             airline = Airline(
                 id=doc.id,
@@ -79,17 +93,155 @@ async def get_popular_airlines(limit: int = 5) -> List[Airline]:
                 country=data.get("country", ""),
                 alliance=data.get("alliance"),
                 type=data.get("type", "FSC"),
-                rating=data.get("averageRatings", {}).get("overall", 0.0),
-                review_count=data.get("totalReviews", 0),
+                rating=rating,
+                review_count=review_count,
                 logo_url=data.get("logoUrl"),
             )
-            results.append(airline)
+            
+            all_airlines.append(airline)
+            
+            # 0점인 경우 평균 계산에서 제외할 수도 있으나, 여기선 포함
+            if review_count > 0:
+                total_rating_sum += rating
+                count_for_mean += 1
+                
+        # 2. 전체 평균(C) 계산
+        C = total_rating_sum / count_for_mean if count_for_mean > 0 else 0
+        m = 10  # 최소 리뷰 수 기준 (조정 가능)
         
-        return results
+        # 3. 가중 평점 계산 및 정렬
+        # (v / (v+m)) * R + (m / (v+m)) * C
+        def weighted_rating(airline: Airline, C: float, m: int) -> float:
+            v = airline.review_count
+            R = airline.rating
+            if v == 0:
+                return 0
+            return (v / (v + m)) * R + (m / (v + m)) * C
+
+        # 가중 평점 계산 후 정렬
+        sorted_airlines = sorted(
+            all_airlines, 
+            key=lambda a: weighted_rating(a, C, m), 
+            reverse=True
+        )
+        
+        # 4. 순위 할당 및 상위 항목 반환
+        result = []
+        for index, airline in enumerate(sorted_airlines[:limit]):
+            airline.rank = index + 1
+            result.append(airline)
+            
+        return result
+            
     except Exception as e:
         if isinstance(e, CustomException):
             raise e
-        raise DatabaseError(message=f"항공사 조회 중 오류 발생: {e}")
+        raise DatabaseError(message=f"인기 항공사 조회 중 오류 발생: {e}")
+
+
+def _get_week_date_range(year: int, month: int, week: int) -> tuple[datetime, datetime]:
+    """
+    특정 연/월의 주차(start, end)를 UTC 기준으로 계산합니다.
+    주차는 1주차를 그 달의 1일~7일, 2주차를 8~14일 식으로 단순 분할합니다.
+    """
+    if week < 1:
+        raise ValueError("week는 1 이상이어야 합니다.")
+    start = datetime(year, month, 1, tzinfo=timezone.utc) + timedelta(days=(week - 1) * 7)
+    end = start + timedelta(days=7)
+    return start, end
+
+
+async def get_popular_airlines_weekly(year: int, month: int, week: int, limit: int = 5) -> List[Airline]:
+    """
+    특정 연/월/주차 기준 인기 항공사 조회 (리뷰/평점 기반 가중 점수)
+    - 주차는 단순히 7일 단위로 끊어서 계산 (1주차: 1~7일, 2주차: 8~14일 ...)
+    """
+    try:
+        start_date, end_date = _get_week_date_range(year, month, week)
+
+        # 1) 해당 기간 리뷰 조회
+        query = (
+            reviews_collection.where("createdAt", ">=", start_date)
+            .where("createdAt", "<", end_date)
+        )
+        review_docs = await run_in_threadpool(lambda: list(query.stream()))
+
+        # 2) 항공사별 리뷰 합계/평균 집계
+        aggregates: Dict[str, Dict[str, float]] = {}
+        for doc in review_docs:
+            data = doc.to_dict()
+            code = data.get("airlineCode")
+            rating = data.get("overallRating", 0.0)
+            if not code:
+                continue
+            bucket = aggregates.setdefault(code, {"sum": 0.0, "count": 0})
+            bucket["sum"] += rating
+            bucket["count"] += 1
+
+        if not aggregates:
+            return []
+
+        # 3) 항공사 메타데이터 조회 (이름/로고 등)
+        def _fetch_airline_docs(codes: List[str]):
+            result = {}
+            for c in codes:
+                result[c] = airlines_collection.document(c).get()
+            return result
+
+        codes = list(aggregates.keys())
+        airline_docs = await run_in_threadpool(lambda: _fetch_airline_docs(codes))
+
+        # 전체 평균 C 계산
+        total_rating_sum = sum(v["sum"] for v in aggregates.values())
+        total_count = sum(v["count"] for v in aggregates.values())
+        C = total_rating_sum / total_count if total_count > 0 else 0
+        m = 10
+
+        # 4) Airline 모델 변환
+        all_airlines: List[Airline] = []
+        for code, agg in aggregates.items():
+            doc = airline_docs.get(code)
+            data = doc.to_dict() if doc and doc.exists else {}
+            avg_rating = agg["sum"] / agg["count"] if agg["count"] > 0 else 0.0
+            airline = Airline(
+                id=code,
+                name=data.get("airlineName", code),
+                code=code,
+                country=data.get("country", ""),
+                alliance=data.get("alliance"),
+                type=data.get("type", "FSC"),
+                rating=round(avg_rating, 2),
+                review_count=int(agg["count"]),
+                logo_url=data.get("logoUrl"),
+            )
+            all_airlines.append(airline)
+
+        # 5) 가중 평점 정렬
+        def weighted_rating(airline: Airline, C: float, m: int) -> float:
+            v = airline.review_count
+            R = airline.rating
+            if v == 0:
+                return 0
+            return (v / (v + m)) * R + (m / (v + m)) * C
+
+        sorted_airlines = sorted(
+            all_airlines,
+            key=lambda a: weighted_rating(a, C, m),
+            reverse=True,
+        )
+
+        # 6) 순위 부여
+        result = []
+        for idx, airline in enumerate(sorted_airlines[:limit]):
+            airline.rank = idx + 1
+            result.append(airline)
+
+        return result
+
+    except Exception as e:
+        if isinstance(e, CustomException):
+            raise e
+        raise DatabaseError(message=f\"주차별 인기 항공사 조회 중 오류 발생: {e}\")
 
 
 async def get_airline_detail(airline_code: str) -> Optional[AirlineDetail]:
