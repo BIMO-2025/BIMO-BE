@@ -1,11 +1,19 @@
+"""
+애플리케이션 설정 및 환경 변수 관리
+"""
+
 import os
+from functools import lru_cache
 from typing import Optional
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
 from app.core.exceptions.exceptions import AppConfigError
 
 
 class Settings(BaseSettings):
+    """애플리케이션 설정 클래스"""
+    
     # Firebase 설정
     FIREBASE_SERVICE_ACCOUNT_KEY: Optional[str] = None
 
@@ -32,28 +40,31 @@ class Settings(BaseSettings):
         extra="ignore"  # 정의되지 않은 환경변수는 무시
     )
 
-try:
-    settings = Settings()
-except Exception as e:
-    raise AppConfigError(f"환경 변수 설정 오류: {e}")
-
-
-# 의존성 주입을 위한 설정 객체 반환 함수
-from functools import lru_cache
 
 @lru_cache()
 def get_settings() -> Settings:
-    return Settings()
+    """
+    설정 객체를 반환합니다.
+    lru_cache로 싱글톤 패턴 구현
+    
+    Returns:
+        Settings 인스턴스
+    
+    Raises:
+        AppConfigError: 환경 변수 설정 오류 시
+    """
+    try:
+        return Settings()
+    except Exception as e:
+        raise AppConfigError(f"환경 변수 설정 오류: {e}")
 
-settings = get_settings()
 
-# 모듈 레벨에서 직접 접근 가능하도록 변수 export
-GEMINI_API_KEY = settings.GEMINI_API_KEY
-GEMINI_MODEL_NAME = settings.GEMINI_MODEL_NAME
-FIREBASE_SERVICE_ACCOUNT_KEY = settings.FIREBASE_SERVICE_ACCOUNT_KEY
-API_SECRET_KEY = settings.API_SECRET_KEY
-API_TOKEN_ALGORITHM = settings.API_TOKEN_ALGORITHM
-API_TOKEN_EXPIRE_MINUTES = settings.API_TOKEN_EXPIRE_MINUTES
-AMADEUS_API_KEY = settings.AMADEUS_API_KEY
-AMADEUS_API_SECRET = settings.AMADEUS_API_SECRET
-AMADEUS_ENVIRONMENT = settings.AMADEUS_ENVIRONMENT
+# 모듈 레벨 settings (하위 호환성)
+try:
+    settings = get_settings()
+except AppConfigError:
+    # 설정 오류 시 앱 시작 중단
+    raise
+
+
+__all__ = ["Settings", "get_settings", "settings"]

@@ -29,27 +29,55 @@ from app.feature.offline.offline_service import OfflineService
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # 1. 서비스 초기화 및 시작
-    print("🚀 Services initializing...")
+    """
+    애플리케이션 lifespan 관리
+    서비스 초기화 및 정리를 담당합니다.
+    """
+    # ==========================================================================
+    # 서비스 초기화
+    # ==========================================================================
+    print("[*] Services initializing...")
     
-    # NetworkMonitor
+    # 1. 코어 서비스 초기화
+    # -------------------------
+    # Firebase
+    from app.core.firebase import get_firebase_service
+    firebase_service = get_firebase_service()
+    firebase_service.initialize()
+    app.state.firebase_service = firebase_service
+    print("[OK] Firebase initialized")
+    
+    # Amadeus 클라이언트 (lazy initialization으로 필요시 초기화됨)
+    from app.core.clients.amadeus import get_amadeus_client
+    app.state.amadeus_client = get_amadeus_client()
+    print("[OK] Amadeus client ready")
+    
+    # Gemini 클라이언트 (lazy initialization으로 필요시 초기화됨)
+    from app.feature.llm.gemini_client import get_gemini_client
+    app.state.gemini_client = get_gemini_client()
+    print("[OK] Gemini client ready")
+    
+    # 2. 네트워크 모니터링 서비스
+    # -------------------------
     network_monitor = NetworkMonitor()
     await network_monitor.start_monitoring(interval=30)
     app.state.network_monitor = network_monitor
+    print("[OK] Network monitor started")
     
-    # LocalDatabase (가정: 초기화 필요 없음 또는 간단함)
+    # 3. 오프라인 관련 서비스
+    # -------------------------
+    # LocalDatabase
     local_db = LocalDatabase()
     
-    # SyncQueue
-    # 주의: SyncQueue가 내부적으로 network_monitor 등을 필요로 할 수 있음.
-    # 만약 SyncQueue도 리팩토링 대상이라면 주입해줘야 함.
-    # 현재는 기존 코드 호환성을 위해 최대한 유지하되, 리팩토링된 OfflineService 조립
-    sync_queue = SyncQueue() # TODO: SyncQueue도 DI 적용 필요 시 수정
+    # SyncQueue (DI 적용)
+    sync_queue = SyncQueue()
+    # TODO: 나중에 SyncQueue도 의존성 주입 패턴 적용 시 network_monitor 주입
     
     # CacheService
-    cache_service = CacheService() # TODO: CacheService도 DI 적용 필요 시 수정
+    cache_service = CacheService()
+    # TODO: 나중에 CacheService도 의존성 주입 패턴 적용 시 수정
     
-    # OfflineService 조립 (의존성 주입)
+    # OfflineService (의존성 주입)
     offline_service = OfflineService(
         local_db=local_db,
         network_monitor=network_monitor,
@@ -57,15 +85,19 @@ async def lifespan(app: FastAPI):
         cache_service=cache_service
     )
     app.state.offline_service = offline_service
+    print("[OK] Offline services initialized")
     
-    print("✅ Services started.")
+    print("[OK] All services started successfully.\n")
     
     yield
     
-    # 2. 서비스 종료 및 정리
-    print("🛑 Services shutting down...")
+    # ==========================================================================
+    # 서비스 종료 및 정리
+    # ==========================================================================
+    print("\n[*] Services shutting down...")
     await network_monitor.stop_monitoring()
-    print("Services stopped.")
+    print("[OK] All services stopped.")
+
 
 
 # 4. FastAPI 앱 인스턴스 생성

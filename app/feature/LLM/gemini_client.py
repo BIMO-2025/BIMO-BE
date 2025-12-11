@@ -74,6 +74,29 @@ class GeminiClient:
         return text.strip()
 
 
-gemini_client = GeminiClient()
+# =============================================================================
+# 하위 호환성을 위한 모듈 레벨 변수 (deprecated)
+# 새로운 코드에서는 GeminiClient를 직접 인스턴스화하거나 DI를 사용하세요.
+# =============================================================================
 
-__all__ = ["GeminiClient", "gemini_client"]
+# Lazy initialization을 위한 변수
+_gemini_client = None
+
+
+def get_gemini_client() -> GeminiClient:
+    """
+    Gemini 클라이언트 인스턴스를 반환합니다.
+    
+    Returns:
+        GeminiClient 인스턴스
+    """
+    global _gemini_client
+    if _gemini_client is None:
+        _gemini_client = GeminiClient()
+    return _gemini_client
+
+
+# 하위 호환성을 위해: 모듈 import 시 자동 초기화하지 않음
+gemini_client = None  # deprecated: get_gemini_client()를 사용하세요
+
+__all__ = ["GeminiClient", "get_gemini_client", "gemini_client"]

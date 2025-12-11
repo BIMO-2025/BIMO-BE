@@ -13,6 +13,18 @@ router = APIRouter(
 )
 
 
+async def _handle_social_login(
+    authenticate_func,
+    request: auth_schemas.SocialLoginRequest
+) -> auth_schemas.TokenResponse:
+    """소셜 로그인 공통 핸들러"""
+    result = await authenticate_func(request.token, fcm_token=request.fcm_token)
+    return auth_schemas.TokenResponse(
+        access_token=result["access_token"],
+        token_type=result["token_type"]
+    )
+
+
 @router.post("/google/login", response_model=auth_schemas.TokenResponse)
 async def login_with_google(request: auth_schemas.SocialLoginRequest):
     """
@@ -27,11 +39,7 @@ async def login_with_google(request: auth_schemas.SocialLoginRequest):
         - **access_token**: 우리 서비스 전용 JWT 토큰
         - **token_type**: "bearer"
     """
-    result = await auth_service.authenticate_with_google(request.token, fcm_token=request.fcm_token)
-    return {
-        "access_token": result["access_token"],
-        "token_type": result["token_type"]
-    }
+    return await _handle_social_login(auth_service.authenticate_with_google, request)
 
 
 @router.post("/apple/login", response_model=auth_schemas.TokenResponse)
@@ -48,11 +56,7 @@ async def login_with_apple(request: auth_schemas.SocialLoginRequest):
         - **access_token**: 우리 서비스 전용 JWT 토큰
         - **token_type**: "bearer"
     """
-    result = await auth_service.authenticate_with_apple(request.token, fcm_token=request.fcm_token)
-    return {
-        "access_token": result["access_token"],
-        "token_type": result["token_type"]
-    }
+    return await _handle_social_login(auth_service.authenticate_with_apple, request)
 
 
 @router.post("/kakao/login", response_model=auth_schemas.TokenResponse)
@@ -69,8 +73,4 @@ async def login_with_kakao(request: auth_schemas.SocialLoginRequest):
         - **access_token**: 우리 서비스 전용 JWT 토큰
         - **token_type**: "bearer"
     """
-    result = await auth_service.authenticate_with_kakao(request.token, fcm_token=request.fcm_token)
-    return {
-        "access_token": result["access_token"],
-        "token_type": result["token_type"]
-    }
+    return await _handle_social_login(auth_service.authenticate_with_kakao, request)
