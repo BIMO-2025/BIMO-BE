@@ -28,6 +28,7 @@ class FlightsService:
             firebase_service: Firebase 서비스 인스턴스
         """
         self.amadeus_client = amadeus_client
+        self.firebase_service = firebase_service
         self.db = firebase_service.db
         self.airports_collection = self.db.collection("airports")
 
@@ -95,7 +96,7 @@ class FlightsService:
             # 지연 임포트로 순환 참조 방지
             from app.feature.airlines.airline_service import AirlineService
             
-            airline_service = AirlineService(firebase_service=FirebaseService())
+            airline_service = AirlineService(firebase_service=self.firebase_service)
             airline_stats_map = {}
             for code in airline_codes:
                 # 병렬 처리하면 좋겠지만, 일단 순차 처리 (캐싱 고려 가능)
