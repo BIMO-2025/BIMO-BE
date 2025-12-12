@@ -10,6 +10,7 @@ from app.feature.wellness import wellness_router
 from app.feature.notifications import notification_router
 from app.feature.offline import offline_router
 from app.feature.flights import flights_router
+from app.feature.airlines import airline_router
 
 # 2. Firebase 초기화 실행
 from app.core import firebase
@@ -125,3 +126,4 @@ app.include_router(wellness_router.router)
 app.include_router(notification_router.router)
 app.include_router(offline_router.router)
 app.include_router(flights_router.router)
+app.include_router(airline_router.router)
