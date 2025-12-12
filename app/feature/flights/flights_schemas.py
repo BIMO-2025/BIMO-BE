@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field, ConfigDict
-from typing import Dict, Literal, Optional, List
+from typing import Dict, Literal, Optional, List, Any
 from datetime import datetime, timezone
 
 class MyFlightSchema(BaseModel):
@@ -100,8 +100,8 @@ class FlightSearchRequest(BaseModel):
         json_schema_extra={
             "example": {
                 "origin": "ICN",
-                "destination": "JFK",
-                "departure_date": "2025-06-15",
+                "destination": "LHR",
+                "departure_date": "2025-12-30",
                 "adults": 1
             }
         }
@@ -124,8 +124,8 @@ class SegmentSchema(BaseModel):
     departure: Dict = Field(..., description="출발 정보 (공항 코드, 시간 등)")
     arrival: Dict = Field(..., description="도착 정보 (공항 코드, 시간 등)")
     carrier_code: str = Field(..., alias="carrierCode", description="항공사 코드")
-    number: str = Field(..., description="항공편 번호")
-    aircraft: Optional[Dict] = Field(None, description="항공기 정보")
+    number: str = Field(..., description="항공편 번호(KE901)")
+    aircraft: Optional[Dict] = Field(None, description="항공기 정보(Boeing 737-800)")
     duration: Optional[str] = Field(None, description="비행 시간")
 
     model_config = ConfigDict(populate_by_name=True)
@@ -206,14 +206,16 @@ class FlightSearchResponse(BaseModel):
     """
     항공편 검색 응답 스키마
     """
-    flight_offers: List[FlightOfferSchema] = Field(..., description="검색된 항공편 제안 리스트")
     count: int = Field(..., description="검색된 항공편 개수")
-
+    flight_offers: List[Dict] = Field(..., description="검색된 항공편 제안 리스트")
+    airlines: List[AirlineSchema] = Field(default_factory=list, description="검색 결과에 포함된 항공사 정보 목록 (overallRating 내림차순 정렬)")
+    
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
                 "flight_offers": [],
-                "count": 0
+                "count": 0,
+                "airlines": []
             }
         }
     )

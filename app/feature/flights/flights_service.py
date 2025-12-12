@@ -2,7 +2,7 @@
 항공편 검색 관련 비즈니스 로직
 """
 
-from typing import List
+from typing import List, Dict
 from fastapi.concurrency import run_in_threadpool
 
 from app.core.firebase import FirebaseService
@@ -31,6 +31,25 @@ class FlightsService:
         self.firebase_service = firebase_service
         self.db = firebase_service.db
         self.airports_collection = self.db.collection("airports")
+    
+    @staticmethod
+    def _format_duration(duration: str) -> str:
+        """
+        ISO 8601 duration 형식(PT35H14M)을 간단한 형식(35H14M)으로 변환
+        
+        Args:
+            duration: ISO 8601 duration 문자열 (예: "PT35H14M")
+            
+        Returns:
+            변환된 duration 문자열 (예: "35H14M")
+        """
+        if not duration:
+            return duration
+        
+        # "PT" prefix 제거
+        if duration.startswith("PT"):
+            return duration[2:]
+        return duration
 
     async def search_flights(self, request: FlightSearchRequest) -> FlightSearchResponse:
         """
@@ -61,8 +80,15 @@ class FlightsService:
                     flight_offer = FlightOfferSchema(**offer)
                     
                     # 유효한 항공사 코드 수집
+                    # 1. validating_airline_codes에서 추출
                     if flight_offer.validating_airline_codes:
                         airline_codes.add(flight_offer.validating_airline_codes[0])
+                    
+                    # 2. segments의 carrierCode에서도 추출 (validating_airline_codes가 없는 경우 대비)
+                    for itinerary in flight_offer.itineraries:
+                        for segment in itinerary.segments:
+                            if segment.carrier_code:
+                                airline_codes.add(segment.carrier_code)
                     
                     # 직항/경유 정보 계산
                     total_segments = 0
@@ -110,10 +136,32 @@ class FlightsService:
             
             # 4. 결과에 항공사 정보 주입
             for offer in flight_offers:
+                # 1. validating_airline_codes에서 항공사 코드 추출 시도
+                airline_code = None
                 if offer.validating_airline_codes:
-                    code = offer.validating_airline_codes[0]
-                    if code in airline_stats_map:
-                        offer.airline_info = airline_stats_map[code]
+                    airline_code = offer.validating_airline_codes[0]
+                
+                # 2. validating_airline_codes가 없으면 segments의 carrierCode 사용
+                if not airline_code and offer.itineraries:
+                    for itinerary in offer.itineraries:
+                        for segment in itinerary.segments:
+                            if segment.carrier_code:
+                                airline_code = segment.carrier_code
+                                break
+                        if airline_code:
+                            break
+                
+                # 3. 항공사 정보 주입
+                if airline_code and airline_code in airline_stats_map:
+                    offer.airline_info = airline_stats_map[airline_code]
+            
+            # 4-1. 검색 결과에 포함된 항공사 목록 생성 (중복 제거, overallRating 내림차순 정렬)
+            unique_airlines = list(airline_stats_map.values())
+            sorted_airlines = sorted(
+                unique_airlines,
+                key=lambda x: x.overallRating if x else 0.0,
+                reverse=True
+            )
             
             # 5. 정렬 (기본값: overallRating 내림차순, 요청된 경우 해당 정렬 적용)
             if request.sort_by:
@@ -139,9 +187,48 @@ class FlightsService:
                     reverse=True
                 )
 
+            # 클라이언트에게 반환할 때 불필요한 필드 제외
+            excluded_fields = {
+                "id",
+                "source",
+                "instant_ticketing_required",
+                "non_homogeneous",
+                "last_ticketing_date",
+                "validating_airline_codes",
+                "traveler_pricings",
+                "airline_info"  # airline_info는 내부적으로만 사용하고, overallRating만 노출
+            }
+            
+            # 각 flight_offer를 dict로 변환하면서 제외할 필드 제거 및 duration 포맷팅
+            filtered_offers = []
+            for offer in flight_offers:
+                offer_dict = offer.model_dump(exclude=excluded_fields, exclude_none=True, by_alias=True)
+                
+                # overallRating을 항공편 결과에 직접 추가
+                if offer.airline_info and offer.airline_info.overallRating is not None:
+                    offer_dict["overallRating"] = offer.airline_info.overallRating
+                else:
+                    offer_dict["overallRating"] = 0.0
+                
+                # 각 itinerary의 duration 포맷팅
+                if "itineraries" in offer_dict:
+                    for itinerary in offer_dict["itineraries"]:
+                        # itinerary의 duration 포맷팅
+                        if "duration" in itinerary:
+                            itinerary["duration"] = self._format_duration(itinerary["duration"])
+                        
+                        # segments의 duration 포맷팅
+                        if "segments" in itinerary:
+                            for segment in itinerary["segments"]:
+                                if "duration" in segment and segment["duration"]:
+                                    segment["duration"] = self._format_duration(segment["duration"])
+                
+                filtered_offers.append(offer_dict)
+
             return FlightSearchResponse(
-                flight_offers=flight_offers,
-                count=len(flight_offers),
+                flight_offers=filtered_offers,  # dict 리스트로 반환
+                count=len(filtered_offers),
+                airlines=sorted_airlines,  # 항공사 목록 추가 (overallRating 내림차순)
             )
 
         except ExternalApiError:

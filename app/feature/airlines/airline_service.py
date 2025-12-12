@@ -326,14 +326,20 @@ class AirlineService:
             
             data = doc.to_dict()
             
-            # 전체 평균 평점 계산
-            avg_ratings = data.get("averageRatings", {})
-            if avg_ratings:
-                overall_rating = round(sum(avg_ratings.values()) / len(avg_ratings), 2)
+            # Firestore에 저장된 overallRating이 있으면 우선 사용, 없으면 계산
+            if "overallRating" in data and data["overallRating"] is not None:
+                overall_rating = data["overallRating"]
             else:
-                overall_rating = 0.0
+                # 전체 평균 평점 계산 (overallRating이 없는 경우에만)
+                avg_ratings = data.get("averageRatings", {})
+                if avg_ratings:
+                    overall_rating = round(sum(avg_ratings.values()) / len(avg_ratings), 2)
+                else:
+                    overall_rating = 0.0
+                # 계산한 값을 data에 저장
+                data["overallRating"] = overall_rating
             
-            # overallRating 필드 추가
+            # overallRating 필드가 data에 확실히 포함되도록 보장
             data["overallRating"] = overall_rating
             
             return AirlineSchema(**data)
