@@ -7,22 +7,27 @@ from typing import Optional, List, Dict, Any, Callable
 from datetime import datetime, timedelta
 
 from app.feature.offline.local_db import LocalDatabase
-from app.core.network_monitor import NetworkMonitor, get_network_monitor
+from app.core.network_monitor import NetworkMonitor
 from app.core.exceptions.exceptions import DatabaseError
 
 
 class CacheService:
     """오프라인 캐싱 서비스 클래스"""
     
-    def __init__(self, local_db: Optional[LocalDatabase] = None):
+    def __init__(
+        self,
+        network_monitor: NetworkMonitor,
+        local_db: Optional[LocalDatabase] = None
+    ):
         """
         캐싱 서비스 초기화
         
         Args:
+            network_monitor: 네트워크 모니터 인스턴스 (의존성 주입)
             local_db: 로컬 데이터베이스 인스턴스
         """
         self.local_db = local_db or LocalDatabase()
-        self.network_monitor = get_network_monitor()
+        self.network_monitor = network_monitor
     
     async def get_or_fetch(
         self,
@@ -178,15 +183,24 @@ class CacheService:
 _cache_service: Optional[CacheService] = None
 
 
-def get_cache_service() -> CacheService:
+def get_cache_service(network_monitor: Optional[NetworkMonitor] = None) -> CacheService:
     """
-    전역 캐시 서비스 인스턴스 반환
+    전역 캐시 서비스 인스턴스 반환 (하위 호환성 유지)
+    
+    Args:
+        network_monitor: 네트워크 모니터 인스턴스 (선택적, 없으면 싱글톤 사용)
     
     Returns:
         CacheService 인스턴스
+    
+    Note:
+        의존성 주입 패턴을 사용하는 경우, 직접 CacheService를 생성하는 것을 권장합니다.
     """
     global _cache_service
     if _cache_service is None:
-        _cache_service = CacheService()
+        if network_monitor is None:
+            from app.core.network_monitor import get_network_monitor
+            network_monitor = get_network_monitor()
+        _cache_service = CacheService(network_monitor=network_monitor)
     return _cache_service
 

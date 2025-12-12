@@ -3,7 +3,7 @@
 from fastapi import FastAPI
 
 # 1. 기능별 라우터 import
-from app.feature.LLM import llm_router
+from app.feature.llm import llm_router
 from app.feature.auth import auth_router
 from app.feature.reviews import reviews_router
 from app.feature.wellness import wellness_router
@@ -69,13 +69,11 @@ async def lifespan(app: FastAPI):
     # LocalDatabase
     local_db = LocalDatabase()
     
-    # SyncQueue (DI 적용)
-    sync_queue = SyncQueue()
-    # TODO: 나중에 SyncQueue도 의존성 주입 패턴 적용 시 network_monitor 주입
+    # SyncQueue (의존성 주입 적용)
+    sync_queue = SyncQueue(network_monitor=network_monitor)
     
-    # CacheService
-    cache_service = CacheService()
-    # TODO: 나중에 CacheService도 의존성 주입 패턴 적용 시 수정
+    # CacheService (의존성 주입 적용)
+    cache_service = CacheService(network_monitor=network_monitor)
     
     # OfflineService (의존성 주입)
     offline_service = OfflineService(

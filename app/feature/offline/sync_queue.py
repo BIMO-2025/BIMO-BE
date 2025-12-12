@@ -10,7 +10,7 @@ from datetime import datetime
 from enum import Enum
 
 from app.feature.offline.local_db import LocalDatabase
-from app.core.network_monitor import NetworkMonitor, get_network_monitor
+from app.core.network_monitor import NetworkMonitor
 from app.core.firebase import db
 from app.core.exceptions.exceptions import DatabaseError, CustomException
 
@@ -26,15 +26,20 @@ class QueueStatus(Enum):
 class SyncQueue:
     """오프라인 동기화 큐 관리 클래스"""
     
-    def __init__(self, local_db: Optional[LocalDatabase] = None):
+    def __init__(
+        self, 
+        network_monitor: NetworkMonitor,
+        local_db: Optional[LocalDatabase] = None
+    ):
         """
         동기화 큐 초기화
         
         Args:
+            network_monitor: 네트워크 모니터 인스턴스 (의존성 주입)
             local_db: 로컬 데이터베이스 인스턴스
         """
         self.local_db = local_db or LocalDatabase()
-        self.network_monitor = get_network_monitor()
+        self.network_monitor = network_monitor
         self._syncing: bool = False
         self._sync_task: Optional[asyncio.Task] = None
         
@@ -387,15 +392,24 @@ class SyncQueue:
 _sync_queue: Optional[SyncQueue] = None
 
 
-def get_sync_queue() -> SyncQueue:
+def get_sync_queue(network_monitor: Optional[NetworkMonitor] = None) -> SyncQueue:
     """
-    전역 동기화 큐 인스턴스 반환
+    전역 동기화 큐 인스턴스 반환 (하위 호환성 유지)
+    
+    Args:
+        network_monitor: 네트워크 모니터 인스턴스 (선택적, 없으면 싱글톤 사용)
     
     Returns:
         SyncQueue 인스턴스
+    
+    Note:
+        의존성 주입 패턴을 사용하는 경우, 직접 SyncQueue를 생성하는 것을 권장합니다.
     """
     global _sync_queue
     if _sync_queue is None:
-        _sync_queue = SyncQueue()
+        if network_monitor is None:
+            from app.core.network_monitor import get_network_monitor
+            network_monitor = get_network_monitor()
+        _sync_queue = SyncQueue(network_monitor=network_monitor)
     return _sync_queue
 
