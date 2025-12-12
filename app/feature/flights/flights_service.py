@@ -115,7 +115,7 @@ class FlightsService:
                     if code in airline_stats_map:
                         offer.airline_info = airline_stats_map[code]
             
-            # 5. 정렬 (요청된 경우)
+            # 5. 정렬 (기본값: overallRating 내림차순, 요청된 경우 해당 정렬 적용)
             if request.sort_by:
                 if request.sort_by == "rating_desc":
                     flight_offers.sort(
@@ -132,6 +132,12 @@ class FlightsService:
                     flight_offers.sort(
                         key=lambda x: float(x.price.total) if x.price.total else float('inf')
                     )
+            else:
+                # 기본 정렬: overallRating 내림차순
+                flight_offers.sort(
+                    key=lambda x: x.airline_info.overallRating if x.airline_info else 0.0, 
+                    reverse=True
+                )
 
             return FlightSearchResponse(
                 flight_offers=flight_offers,
