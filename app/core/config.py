@@ -32,7 +32,7 @@ class Settings(BaseSettings):
     AMADEUS_ENVIRONMENT: str = "test"
 
     # Google OAuth 설정 (iOS)
-    GOOGLE_IOS_CLIENT_ID: Optional[str] = "129141636882-7iu0m24usb4dvimetr0q7fir7lmi05d9.apps.googleusercontent.com"
+    GOOGLE_IOS_CLIENT_ID: Optional[str] = None
 
     model_config = SettingsConfigDict(
         env_file=".env",
