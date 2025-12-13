@@ -15,6 +15,7 @@ from app.feature.wellness.wellness_schemas import (
 )
 from app.feature.llm import llm_service
 from app.feature.llm.llm_schemas import LLMChatRequest
+from app.feature.flights.flights_schemas import MyFlightSchema
 
 
 def calculate_time_difference(origin_tz: str, dest_tz: str) -> int:
@@ -269,4 +270,32 @@ def _extract_recommendations(llm_response: str, section_name: str) -> List[str]:
         return items if items else []
     
     return []
+
+
+def convert_my_flight_to_segment(my_flight: MyFlightSchema) -> FlightSegment:
+    """
+    MyFlightSchema를 FlightSegment로 변환합니다.
+    
+    Args:
+        my_flight: 사용자의 비행 기록
+        
+    Returns:
+        FlightSegment 객체
+        
+    Raises:
+        ValueError: 공항 정보가 없는 경우
+    """
+    if not my_flight.departureAirport or not my_flight.arrivalAirport:
+        raise ValueError("출발지 또는 도착지 공항 정보가 필요합니다.")
+    
+    # 비행 시간 계산
+    duration = (my_flight.arrivalTime - my_flight.departureTime).total_seconds() / 3600
+    
+    return FlightSegment(
+        departure_airport=my_flight.departureAirport,
+        arrival_airport=my_flight.arrivalAirport,
+        departure_time=my_flight.departureTime,
+        arrival_time=my_flight.arrivalTime,
+        flight_duration_hours=duration
+    )
 
