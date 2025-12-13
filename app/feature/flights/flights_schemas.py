@@ -13,6 +13,8 @@ class MyFlightSchema(BaseModel):
     arrivalTime: datetime
     status: Literal["scheduled", "completed"]
     reviewId: Optional[str] = None
+    departureAirport: Optional[str] = Field(None, description="출발 공항 코드 (예: ICN)")
+    arrivalAirport: Optional[str] = Field(None, description="도착 공항 코드 (예: JFK)")
 
     model_config = ConfigDict(
         from_attributes=True,
@@ -23,6 +25,8 @@ class MyFlightSchema(BaseModel):
                 "departureTime": "2025-12-25T13:45:00Z",
                 "arrivalTime": "2025-12-25T18:20:00Z",
                 "status": "scheduled",
+                "departureAirport": "ICN",
+                "arrivalAirport": "JFK",
             }
         }
     )
