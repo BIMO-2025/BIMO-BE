@@ -41,36 +41,16 @@ async def search_airlines(
     return await service.search_airlines(query)
 
 
-@router.get("/popular", response_model=List[Airline])
-async def get_popular_airlines(
-    limit: int = 5,
+@router.get("/sorting", response_model=List[Airline])
+async def get_airlines_sorted_by_rating(
     service = Depends(get_airline_service)
 ):
     """
-    인기 항공사 목록을 조회합니다 (리뷰 수 기준).
+    모든 항공사를 overallRating 순으로 정렬하여 조회합니다.
     
-    - **limit**: 조회할 개수 (기본값: 5)
+    Firestore airlines collection에 저장된 항공사들을 overallRating 내림차순으로 정렬하여 반환합니다.
     """
-    return await service.get_popular_airlines(limit)
-
-
-@router.get("/popular/weekly", response_model=List[Airline])
-async def get_popular_airlines_weekly(
-    year: int,
-    month: int,
-    week: int,
-    limit: int = 5,
-    service = Depends(get_airline_service)
-):
-    """
-    특정 연/월/주차 기준 인기 항공사를 조회합니다.
-    
-    - **year**: 연도 (예: 2025)
-    - **month**: 월 (1-12)
-    - **week**: 주차 (1주차=1~7일, 2주차=8~14일 ...)
-    - **limit**: 조회할 개수 (기본값: 5)
-    """
-    return await service.get_popular_airlines_weekly(year, month, week, limit)
+    return await service.get_airlines_sorted_by_rating()
 
 
 @router.get("/{airline_code}", response_model=AirlineSchema)

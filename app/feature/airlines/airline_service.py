@@ -348,6 +348,60 @@ class AirlineService:
                 raise e
             raise DatabaseError(message=f"항공사 통계 조회 중 오류 발생: {e}")
     
+    async def get_airlines_sorted_by_rating(self) -> List[Airline]:
+        """
+        모든 항공사를 overallRating 순으로 정렬하여 반환합니다.
+        
+        Returns:
+            overallRating 내림차순으로 정렬된 항공사 목록
+        """
+        try:
+            # 모든 항공사 조회
+            docs = await run_in_threadpool(lambda: list(self.airlines_collection.stream()))
+            
+            all_airlines = []
+            
+            for doc in docs:
+                data = doc.to_dict()
+                
+                # overallRating 계산 (get_airline_statistics와 동일한 로직)
+                if "overallRating" in data and data["overallRating"] is not None:
+                    overall_rating = data["overallRating"]
+                else:
+                    # 전체 평균 평점 계산 (overallRating이 없는 경우에만)
+                    avg_ratings = data.get("averageRatings", {})
+                    if avg_ratings:
+                        overall_rating = round(sum(avg_ratings.values()) / len(avg_ratings), 2)
+                    else:
+                        overall_rating = 0.0
+                
+                airline = Airline(
+                    id=doc.id,
+                    name=data.get("airlineName", ""),
+                    code=doc.id,
+                    country=data.get("country", ""),
+                    alliance=data.get("alliance"),
+                    type=data.get("type", "FSC"),
+                    rating=overall_rating,
+                    review_count=data.get("totalReviews", 0),
+                    logo_url=data.get("logoUrl"),
+                )
+                all_airlines.append(airline)
+            
+            # overallRating 내림차순 정렬
+            sorted_airlines = sorted(
+                all_airlines,
+                key=lambda x: x.rating,
+                reverse=True
+            )
+            
+            return sorted_airlines
+                
+        except Exception as e:
+            if isinstance(e, CustomException):
+                raise e
+            raise DatabaseError(message=f"항공사 정렬 조회 중 오류 발생: {e}")
+    
     # Private helper methods
     
     @staticmethod
