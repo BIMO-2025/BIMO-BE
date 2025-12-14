@@ -72,7 +72,7 @@ class CustomException(Exception):
         *,
         status_code: int = 500,
         error_code: str = "INTERNAL_SERVER_ERROR",
-        message: str = "An internal server error occurred.",
+        message: str = "내부 서버 오류가 발생했습니다.",
     ):
         """
         Args:
@@ -99,7 +99,7 @@ class AuthError(CustomException):
         *,
         status_code: int = 401,
         error_code: str = "AUTH_ERROR",
-        message: str = "Authentication or authorization error.",
+        message: str = "인증 또는 권한 오류가 발생했습니다.",
     ):
         super().__init__(status_code=status_code, error_code=error_code, message=message)
 
@@ -107,7 +107,7 @@ class AuthError(CustomException):
 class AuthInitError(AppConfigError):
     """Firebase Auth 등 인증 시스템 초기화에 실패했을 때 발생하는 오류입니다."""
 
-    def __init__(self, message: str = "Authentication system initialization failed."):
+    def __init__(self, message: str = "인증 시스템 초기화에 실패했습니다."):
         super().__init__(message)
 
 
@@ -119,7 +119,7 @@ class TokenError(AuthError):
         *,
         status_code: int = 401,
         error_code: str = "TOKEN_ERROR",
-        message: str = "An error occurred while processing the token.",
+        message: str = "토큰 처리 중 오류가 발생했습니다.",
     ):
         super().__init__(status_code=status_code, error_code=error_code, message=message)
 
@@ -127,21 +127,21 @@ class TokenError(AuthError):
 class TokenExpiredError(TokenError):
     """토큰이 만료되었을 때 발생하는 오류입니다."""
 
-    def __init__(self, message: str = "The token has expired. Please log in again."):
+    def __init__(self, message: str = "토큰이 만료되었습니다. 다시 로그인해주세요."):
         super().__init__(status_code=401, error_code="TOKEN_EXPIRED", message=message)
 
 
 class InvalidTokenError(TokenError):
     """토큰의 형식이 유효하지 않거나 서명이 잘못되었을 때 발생하는 오류입니다."""
 
-    def __init__(self, message: str = "The token is invalid. Please log in again."):
+    def __init__(self, message: str = "토큰이 유효하지 않습니다. 다시 로그인해주세요."):
         super().__init__(status_code=401, error_code="INVALID_TOKEN", message=message)
 
 
 class TokenVerificationError(TokenError):
     """토큰 검증 로직(예: Firebase)에서 오류가 발생했을 때 사용됩니다."""
 
-    def __init__(self, message: str = "An error occurred during token verification."):
+    def __init__(self, message: str = "토큰 검증 중 오류가 발생했습니다."):
         super().__init__(
             status_code=401, error_code="TOKEN_VERIFICATION_FAILED", message=message
         )
@@ -151,7 +151,7 @@ class InvalidTokenPayloadError(TokenError):
     """토큰의 페이로드(내용)에 필수 정보가 누락되었을 때 발생하는 오류입니다."""
 
     def __init__(
-        self, message: str = "The token payload is missing required user information."
+        self, message: str = "토큰에 필수 사용자 정보가 누락되었습니다."
     ):
         super().__init__(
             status_code=400, error_code="INVALID_TOKEN_PAYLOAD", message=message
@@ -162,7 +162,7 @@ class PermissionDeniedError(AuthError):
     """사용자가 특정 리소스에 접근할 권한이 없을 때 발생하는 오류입니다."""
 
     def __init__(
-        self, message: str = "You do not have permission to perform this action."
+        self, message: str = "이 작업을 수행할 권한이 없습니다."
     ):
         super().__init__(status_code=403, error_code="PERMISSION_DENIED", message=message)
 
@@ -180,7 +180,7 @@ class UserProfileError(CustomException):
         *,
         status_code: int = 400,
         error_code: str = "USER_PROFILE_ERROR",
-        message: str = "An error occurred related to the user profile.",
+        message: str = "사용자 프로필 관련 오류가 발생했습니다.",
     ):
         super().__init__(status_code=status_code, error_code=error_code, message=message)
 
@@ -189,7 +189,7 @@ class UserProfileNotFoundError(UserProfileError):
     """특정 사용자 프로필을 찾을 수 없을 때 발생하는 오류입니다."""
 
     def __init__(self, user_id: Optional[str] = None):
-        message = "User profile not found."
+        message = "사용자 프로필을 찾을 수 없습니다."
         if user_id:
             message += f" (userId={user_id})"
         super().__init__(status_code=404, error_code="USER_NOT_FOUND", message=message)
@@ -199,7 +199,7 @@ class UserProfileConflictError(UserProfileError):
     """사용자 프로필 생성 시 충돌(예: 이미 존재하는 사용자)이 발생했을 때 사용됩니다."""
 
     def __init__(self, user_id: Optional[str] = None):
-        message = "A user with the given identifier already exists."
+        message = "해당 식별자를 가진 사용자가 이미 존재합니다."
         if user_id:
             message += f" (userId={user_id})"
         super().__init__(
@@ -217,7 +217,7 @@ class DatabaseError(CustomException):
 
     def __init__(
         self,
-        message: str = "A database error occurred.",
+        message: str = "데이터베이스 오류가 발생했습니다.",
         status_code: int = 500,
         error_code: str = "DATABASE_ERROR",
     ):
@@ -228,7 +228,7 @@ class FlightRecordNotFoundError(DatabaseError):
     """특정 비행 기록을 찾을 수 없을 때 발생하는 오류입니다."""
 
     def __init__(self, flight_id: Optional[str] = None):
-        message = "Flight record not found."
+        message = "비행 기록을 찾을 수 없습니다."
         if flight_id:
             message += f" (flightId={flight_id})"
         super().__init__(status_code=404, error_code="FLIGHT_NOT_FOUND", message=message)
@@ -238,7 +238,7 @@ class FlightRecordConflictError(DatabaseError):
     """비행 기록 생성 시 충돌이 발생했을 때 사용됩니다."""
 
     def __init__(self, flight_id: Optional[str] = None):
-        message = "This flight record already exists."
+        message = "이 비행 기록이 이미 존재합니다."
         if flight_id:
             message += f" (flightId={flight_id})"
         super().__init__(
@@ -250,7 +250,7 @@ class ReviewNotFoundError(DatabaseError):
     """특정 리뷰를 찾을 수 없을 때 발생하는 오류입니다."""
 
     def __init__(self, review_id: Optional[str] = None):
-        message = "Review not found."
+        message = "리뷰를 찾을 수 없습니다."
         if review_id:
             message += f" (reviewId={review_id})"
         super().__init__(status_code=404, error_code="REVIEW_NOT_FOUND", message=message)
@@ -259,7 +259,7 @@ class ReviewNotFoundError(DatabaseError):
 class ReviewImageUploadError(DatabaseError):
     """리뷰 이미지 업로드에 실패했을 때 발생하는 오류입니다."""
 
-    def __init__(self, message: str = "Failed to upload review image."):
+    def __init__(self, message: str = "리뷰 이미지 업로드에 실패했습니다."):
         super().__init__(
             status_code=500, error_code="REVIEW_IMAGE_UPLOAD_FAILED", message=message
         )
@@ -268,7 +268,7 @@ class ReviewImageUploadError(DatabaseError):
 class AirlineMetricsUpdateError(DatabaseError):
     """항공사 평점/리뷰 수 업데이트에 실패했을 때 발생하는 오류입니다."""
 
-    def __init__(self, message: str = "Failed to update airline metrics."):
+    def __init__(self, message: str = "항공사 평점 업데이트에 실패했습니다."):
         super().__init__(
             status_code=500, error_code="AIRLINE_METRICS_UPDATE_FAILED", message=message
         )
@@ -309,7 +309,7 @@ class LLMError(CustomException):
         *,
         status_code: int = 500,
         error_code: str = "LLM_ERROR",
-        message: str = "An error occurred while interacting with the LLM.",
+        message: str = "AI 모델과의 통신 중 오류가 발생했습니다.",
     ):
         super().__init__(status_code=status_code, error_code=error_code, message=message)
 
@@ -317,7 +317,7 @@ class LLMError(CustomException):
 class PromptBuilderError(LLMError):
     """LLM에 전달할 프롬프트를 생성하는 데 실패했을 때 발생하는 오류입니다."""
 
-    def __init__(self, message: str = "Failed to build the prompt for the AI model."):
+    def __init__(self, message: str = "AI 모델용 프롬프트 생성에 실패했습니다."):
         super().__init__(
             status_code=500, error_code="PROMPT_BUILDER_FAILED", message=message
         )
@@ -327,7 +327,7 @@ class LLMGenerationError(LLMError):
     """LLM이 유효한 응답을 생성하지 못했을 때 발생하는 오류입니다."""
 
     def __init__(
-        self, message: str = "The AI model failed to generate a valid response."
+        self, message: str = "AI 모델이 유효한 응답을 생성하지 못했습니다."
     ):
         super().__init__(
             status_code=500, error_code="LLM_GENERATION_FAILED", message=message

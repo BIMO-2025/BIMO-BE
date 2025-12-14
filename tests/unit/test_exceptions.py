@@ -28,7 +28,7 @@ class TestCustomException:
         
         assert exc.status_code == 500
         assert exc.error_code == "INTERNAL_SERVER_ERROR"
-        assert exc.message == "An internal server error occurred."
+        assert exc.message == "내부 서버 오류가 발생했습니다."
 
     def test_custom_exception_custom(self):
         """커스텀 CustomException 생성"""
@@ -66,7 +66,7 @@ class TestAuthExceptions:
         
         assert exc.status_code == 401
         assert exc.error_code == "TOKEN_EXPIRED"
-        assert "expired" in exc.message.lower()
+        assert "만료" in exc.message
 
     def test_token_expired_error_custom_message(self):
         """커스텀 메시지가 있는 TokenExpiredError"""
