@@ -19,9 +19,23 @@ async def _handle_social_login(
 ) -> auth_schemas.TokenResponse:
     """소셜 로그인 공통 핸들러"""
     result = await authenticate_func(request.token, fcm_token=request.fcm_token)
+    
+    # 사용자 정보 추출
+    user_info = None
+    if "user" in result and result["user"]:
+        user = result["user"]
+        user_info = auth_schemas.UserInfo(
+            uid=user.uid,
+            email=user.email,
+            display_name=user.display_name,
+            photo_url=user.photo_url,
+            provider_id=user.provider_id
+        )
+    
     return auth_schemas.TokenResponse(
         access_token=result["access_token"],
-        token_type=result["token_type"]
+        token_type=result["token_type"],
+        user=user_info
     )
 
 
@@ -64,13 +78,42 @@ async def login_with_kakao(request: auth_schemas.SocialLoginRequest):
     """
     Kakao 로그인 엔드포인트
     
-    클라이언트로부터 받은 Kakao Access Token을 검증하고,
+    클라이언트로부터 받은 Kakao Access Token과 사용자 정보를 받아,
     Firebase Auth 사용자를 생성/조회한 뒤 API Access Token을 발급합니다.
     
     - **token**: Kakao Access Token (Kakao SDK로 발급받은 토큰)
+    - **kakao_id**: 카카오 사용자 ID (선택사항, 클라이언트에서 카카오 SDK로 받은 정보)
+    - **email**: 카카오 계정 이메일 (선택사항)
+    - **display_name**: 카카오 닉네임 (선택사항)
+    - **photo_url**: 카카오 프로필 이미지 URL (선택사항)
     
     Returns:
         - **access_token**: 우리 서비스 전용 JWT 토큰
         - **token_type**: "bearer"
     """
-    return await _handle_social_login(auth_service.authenticate_with_kakao, request)
+    result = await auth_service.authenticate_with_kakao(
+        token=request.token,
+        fcm_token=request.fcm_token,
+        kakao_id=request.kakao_id,
+        email=request.email,
+        display_name=request.display_name,
+        photo_url=request.photo_url
+    )
+    
+    # 사용자 정보 추출
+    user_info = None
+    if "user" in result and result["user"]:
+        user = result["user"]
+        user_info = auth_schemas.UserInfo(
+            uid=user.uid,
+            email=user.email,
+            display_name=user.display_name,
+            photo_url=user.photo_url,
+            provider_id=user.provider_id
+        )
+    
+    return auth_schemas.TokenResponse(
+        access_token=result["access_token"],
+        token_type=result["token_type"],
+        user=user_info
+    )
