@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 from app.feature.wellness import wellness_schemas, wellness_service
+from app.feature.wellness import flight_timeline_schemas, flight_timeline_service
 from app.feature.flights.my_flights_service import MyFlightsService
 from app.core.deps import get_firebase_service
 from app.core.firebase import FirebaseService
@@ -21,10 +22,34 @@ security = HTTPBearer()
 
 
 def get_my_flights_service(
-    firebase_service: FirebaseService = Depends(get_firebase_service)
+    firebase_service = Depends(get_firebase_service)
 ) -> MyFlightsService:
     """MyFlightsService 의존성 주입"""
     return MyFlightsService(firebase_service=firebase_service)
+
+
+@router.post("/flight-timeline", response_model=flight_timeline_schemas.FlightTimelineResponse)
+async def generate_flight_timeline(request: flight_timeline_schemas.FlightTimelineRequest):
+    """
+    LLM을 사용하여 비행 타임라인을 생성합니다.
+    
+    사용자의 비행 정보(출발지, 도착지, 출발/도착 시간)와 비행 목표를 기반으로
+    최적의 기내 활동 타임라인을 생성합니다.
+    
+    - **origin**: 출발 공항 코드 (예: DXB)
+    - **destination**: 도착 공항 코드 (예: ICN)
+    - **departure_time**: 출발 시간 (ISO 8601 형식)
+    - **arrival_time**: 도착 시간 (ISO 8601 형식)
+    - **seat_class**: 좌석 등급 (ECONOMY, BUSINESS, FIRST 등)
+    - **flight_goal**: 비행 목표 (SLEEP_FOCUS, WORK_FOCUS, ENTERTAINMENT 등)
+    - **total_duration**: 총 비행 시간 (선택사항, 예: "9h 30m")
+    
+    Returns:
+        - **flight_info**: 비행 정보 요약
+        - **recommendation_message**: 사용자에게 보여줄 추천 메시지
+        - **timeline_events**: 타임라인 이벤트 목록 (이륙, 식사, 수면, 자유시간, 착륙 등)
+    """
+    return await flight_timeline_service.generate_flight_timeline(request)
 
 
 @router.post("/jetlag-plan", response_model=wellness_schemas.JetLagPlanResponse)

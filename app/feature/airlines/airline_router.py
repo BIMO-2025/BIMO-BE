@@ -22,7 +22,7 @@ router = APIRouter(
 
 
 def get_airline_service(
-    firebase_service: FirebaseService = Depends(get_firebase_service)
+    firebase_service = Depends(get_firebase_service)
 ) -> AirlineService:
     """AirlineService 의존성 주입"""
     return AirlineService(firebase_service=firebase_service)
