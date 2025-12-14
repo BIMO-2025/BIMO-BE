@@ -1,5 +1,6 @@
 from pydantic import BaseModel, Field, ConfigDict
 from datetime import datetime, timezone
+from app.feature.auth.auth_schemas import UserInfo
 
 class UserSchema(BaseModel):
     """
@@ -21,3 +22,28 @@ class UserSchema(BaseModel):
             }
         }
     )
+
+
+# --- 닉네임 업데이트 관련 스키마 ---
+
+class UpdateNicknameRequest(BaseModel):
+    """닉네임 업데이트 요청 스키마"""
+    nickname: str = Field(..., min_length=1, max_length=50, description="설정할 닉네임 (1-50자)")
+
+    model_config = ConfigDict(
+        from_attributes=True,
+        json_schema_extra={
+            "example": {
+                "nickname": "새로운닉네임"
+            }
+        }
+    )
+
+
+class UpdateNicknameResponse(BaseModel):
+    """닉네임 업데이트 응답 스키마"""
+    success: bool
+    message: str
+    user: UserInfo
+
+    model_config = ConfigDict(from_attributes=True)

@@ -11,6 +11,7 @@ from app.feature.notifications import notification_router
 from app.feature.offline import offline_router
 from app.feature.flights import flights_router, my_flights_router
 from app.feature.airlines import airline_router
+from app.feature.users import user_router
 
 # 2. Firebase 초기화 실행
 from app.core import firebase
@@ -120,6 +121,7 @@ def read_root():
 # 5. 기능별 라우터 등록
 
 app.include_router(auth_router.router)
+app.include_router(user_router.router)
 app.include_router(llm_router.router)
 app.include_router(reviews_router.router)
 app.include_router(wellness_router.router)

@@ -96,7 +96,7 @@ class BaseAuthProvider(ABC):
                 user_data = user_doc.to_dict()
                 user_data["last_login_at"] = current_time
                 
-                # FCM 토큰 업데이트 (있을 경우)
+                # 업데이트할 필드들
                 update_data = {"last_login_at": current_time}
                 if fcm_token:
                     fcm_tokens = user_data.get("fcm_tokens", [])
