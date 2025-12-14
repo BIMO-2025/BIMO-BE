@@ -48,12 +48,24 @@ async def authenticate_with_apple(token: str, fcm_token: str | None = None) -> d
     return await AppleAuthProvider.authenticate(token, fcm_token=fcm_token)
 
 
-async def authenticate_with_kakao(token: str, fcm_token: str | None = None) -> dict:
+async def authenticate_with_kakao(
+    token: str,
+    fcm_token: str | None = None,
+    kakao_id: str | None = None,
+    email: str | None = None,
+    display_name: str | None = None,
+    photo_url: str | None = None
+) -> dict:
     """
     Kakao 로그인을 처리합니다.
     
     Args:
         token: 클라이언트로부터 받은 Kakao Access Token
+        fcm_token: FCM 디바이스 토큰 (선택사항)
+        kakao_id: 카카오 사용자 ID (선택사항, 클라이언트에서 받은 정보)
+        email: 카카오 계정 이메일 (선택사항)
+        display_name: 카카오 닉네임 (선택사항)
+        photo_url: 카카오 프로필 이미지 URL (선택사항)
         
     Returns:
         {
@@ -62,7 +74,14 @@ async def authenticate_with_kakao(token: str, fcm_token: str | None = None) -> d
             "user": UserInDB 객체
         }
     """
-    return await KakaoAuthProvider.authenticate(token, fcm_token=fcm_token)
+    return await KakaoAuthProvider.authenticate(
+        token=token,
+        fcm_token=fcm_token,
+        kakao_id=kakao_id,
+        email=email,
+        display_name=display_name,
+        photo_url=photo_url
+    )
 
 
 # ============================================

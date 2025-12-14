@@ -119,6 +119,39 @@ class KakaoAuthProvider(BaseAuthProvider):
         if not email:
             raise InvalidTokenPayloadError(message="Kakao 계정에 이메일 정보가 없습니다.")
 
+        return await KakaoAuthProvider.get_or_create_firebase_user_direct(
+            email=email,
+            display_name=display_name,
+            photo_url=photo_url
+        )
+
+    @staticmethod
+    async def get_or_create_firebase_user_direct(
+        email: str,
+        display_name: str | None = None,
+        photo_url: str | None = None
+    ) -> UserRecord:
+        """
+        [비동기 함수] 클라이언트에서 받은 사용자 정보를 바탕으로 Firebase Auth 사용자를 조회하거나 생성합니다.
+        
+        Args:
+            email: 사용자 이메일 (필수)
+            display_name: 사용자 표시 이름 (선택사항)
+            photo_url: 프로필 이미지 URL (선택사항)
+            
+        Returns:
+            Firebase Auth UserRecord
+            
+        Raises:
+            InvalidTokenPayloadError: 이메일 정보가 없을 때
+            DatabaseError: Firebase Auth 사용자 생성/조회 실패
+        """
+        if not auth_client:
+            raise AuthInitError()
+
+        if not email:
+            raise InvalidTokenPayloadError(message="이메일 정보가 필요합니다.")
+
         try:
             # 1. 이메일로 기존 Firebase Auth 사용자를 찾습니다.
             user_record = await run_in_threadpool(
@@ -169,12 +202,28 @@ class KakaoAuthProvider(BaseAuthProvider):
         )
 
     @classmethod
-    async def authenticate(cls, token: str, fcm_token: str | None = None) -> dict:
+    async def authenticate(
+        cls,
+        token: str,
+        fcm_token: str | None = None,
+        kakao_id: str | None = None,
+        email: str | None = None,
+        display_name: str | None = None,
+        photo_url: str | None = None
+    ) -> dict:
         """
         [비동기 함수] Kakao 로그인 전체 프로세스를 처리합니다.
         
+        클라이언트에서 카카오 SDK로 받은 사용자 정보를 그대로 사용하여
+        카카오 서버 검증 없이 바로 JWT를 발행합니다.
+        
         Args:
-            token: 클라이언트로부터 받은 Kakao Access Token
+            token: 클라이언트로부터 받은 Kakao Access Token (검증하지 않고 식별자로만 사용)
+            fcm_token: FCM 디바이스 토큰 (선택사항)
+            kakao_id: 카카오 사용자 ID (클라이언트에서 받은 정보)
+            email: 카카오 계정 이메일 (클라이언트에서 받은 정보)
+            display_name: 카카오 닉네임 (클라이언트에서 받은 정보)
+            photo_url: 카카오 프로필 이미지 URL (클라이언트에서 받은 정보)
             
         Returns:
             {
@@ -182,17 +231,25 @@ class KakaoAuthProvider(BaseAuthProvider):
                 "token_type": "bearer",
                 "user": UserInDB 객체
             }
+            
+        Raises:
+            InvalidTokenPayloadError: 필수 정보(이메일)가 없을 때
         """
-        # 1. Kakao 토큰 검증 및 사용자 정보 가져오기
-        kakao_user_info = await cls.verify_token(token)
+        # 이메일은 필수 정보입니다
+        if not email:
+            raise InvalidTokenPayloadError(message="카카오 계정 이메일 정보가 필요합니다.")
 
-        # 2. Firebase Auth 사용자 조회 또는 생성
-        firebase_user = await cls.get_or_create_firebase_user(kakao_user_info)
+        # 1. Firebase Auth 사용자 조회 또는 생성 (클라이언트에서 받은 정보 사용)
+        firebase_user = await cls.get_or_create_firebase_user_direct(
+            email=email,
+            display_name=display_name,
+            photo_url=photo_url
+        )
 
-        # 3. Firestore 사용자 조회 또는 생성
+        # 2. Firestore 사용자 조회 또는 생성
         user = await cls.get_or_create_user(firebase_user, fcm_token=fcm_token)
 
-        # 4. API 토큰 생성
+        # 3. API 토큰 생성
         api_access_token = cls.generate_api_token(uid=user.uid)
 
         return {
