@@ -19,8 +19,8 @@ bcrypt==3.2.2
 # HTTP 클라이언트 (Kakao API 호출용)
 httpx>=0.25.0,<0.28.0
 
-# LLM (Gemini API)
-google-generativeai>=0.3.0
+# LLM (Gemini API) - Gemini 1.5 지원
+google-generativeai>=0.8.0
 
 # Amadeus API
 amadeus>=9.0.0

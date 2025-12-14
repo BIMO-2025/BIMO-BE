@@ -54,7 +54,7 @@ async def get_current_user_id(
     if user_id and token_user_id != user_id:
         raise HTTPException(
             status_code=403,
-            detail="You don't have permission to access this resource"
+            detail="이 리소스에 접근할 권한이 없습니다"
         )
     
     return token_user_id or user_id
