@@ -22,7 +22,7 @@ security = HTTPBearer()
 
 
 def get_my_flights_service(
-    firebase_service: FirebaseService = Depends(get_firebase_service)
+    firebase_service = Depends(get_firebase_service)
 ) -> MyFlightsService:
     """MyFlightsService 의존성 주입"""
     return MyFlightsService(firebase_service=firebase_service)
@@ -153,6 +153,7 @@ async def delete_my_flight(
     if not success:
         raise HTTPException(status_code=404, detail="비행 기록을 찾을 수 없습니다.")
     return {"message": "비행 기록이 삭제되었습니다."}
+
 
 
 

@@ -17,7 +17,7 @@ router = APIRouter(
 
 
 def get_flights_service(
-    firebase_service: FirebaseService = Depends(get_firebase_service),
+    firebase_service = Depends(get_firebase_service),
     amadeus_client = Depends(get_amadeus_client)
 ) -> FlightsService:
     """FlightsService 의존성 주입"""

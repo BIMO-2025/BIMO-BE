@@ -623,3 +623,234 @@ class ReviewsService:
             if isinstance(e, CustomException):
                 raise e
             raise DatabaseError(message=f"상세 리뷰 페이지 조회 중 오류 발생: {e}")
+
+    async def create_review(self, review_data: ReviewSchema, user_id: str) -> ReviewSchema:
+        """
+        새로운 리뷰를 생성합니다.
+        
+        Args:
+            review_data: 리뷰 데이터
+            user_id: 사용자 ID (인증용)
+            
+        Returns:
+            생성된 리뷰
+            
+        Raises:
+            DatabaseError: 리뷰 생성 중 오류 발생 시
+        """
+        try:
+            # 사용자 ID 검증
+            if review_data.userId != user_id:
+                raise DatabaseError(message="사용자 ID가 일치하지 않습니다.")
+            
+            # 리뷰 데이터 준비
+            review_dict = review_data.model_dump(exclude={"id"})
+            review_dict["createdAt"] = datetime.now(timezone.utc)
+            
+            # Firestore에 리뷰 저장
+            doc_ref = self.reviews_collection.document()
+            await run_in_threadpool(lambda: doc_ref.set(review_dict))
+            
+            # 생성된 리뷰 조회
+            created_doc = await run_in_threadpool(doc_ref.get)
+            created_data = created_doc.to_dict()
+            created_data["id"] = created_doc.id
+            created_review = ReviewSchema(**created_data)
+            
+            # 항공사 통계 업데이트
+            await self._update_airline_statistics(review_data.airlineCode)
+            
+            return created_review
+        except Exception as e:
+            if isinstance(e, CustomException):
+                raise e
+            raise DatabaseError(message=f"리뷰 생성 중 오류 발생: {e}")
+
+    async def update_review(self, review_id: str, review_data: ReviewSchema, user_id: str) -> ReviewSchema:
+        """
+        기존 리뷰를 수정합니다.
+        
+        Args:
+            review_id: 리뷰 ID
+            review_data: 수정할 리뷰 데이터
+            user_id: 사용자 ID (인증용)
+            
+        Returns:
+            수정된 리뷰
+            
+        Raises:
+            ReviewNotFoundError: 리뷰를 찾을 수 없을 때
+            DatabaseError: 권한이 없거나 오류 발생 시
+        """
+        try:
+            # 기존 리뷰 조회
+            doc_ref = self.reviews_collection.document(review_id)
+            doc = await run_in_threadpool(doc_ref.get)
+            
+            if not doc.exists:
+                raise ReviewNotFoundError(review_id=review_id)
+            
+            existing_data = doc.to_dict()
+            
+            # 사용자 권한 확인
+            if existing_data.get("userId") != user_id:
+                raise DatabaseError(message="리뷰를 수정할 권한이 없습니다.")
+            
+            # 항공사 코드 변경 여부 확인
+            old_airline_code = existing_data.get("airlineCode")
+            new_airline_code = review_data.airlineCode
+            airline_changed = old_airline_code != new_airline_code
+            
+            # 리뷰 데이터 업데이트
+            update_dict = review_data.model_dump(exclude={"id", "userId", "createdAt"})
+            await run_in_threadpool(lambda: doc_ref.update(update_dict))
+            
+            # 수정된 리뷰 조회
+            updated_doc = await run_in_threadpool(doc_ref.get)
+            updated_data = updated_doc.to_dict()
+            updated_data["id"] = updated_doc.id
+            updated_review = ReviewSchema(**updated_data)
+            
+            # 항공사 통계 업데이트
+            await self._update_airline_statistics(new_airline_code)
+            if airline_changed:
+                # 이전 항공사의 통계도 업데이트
+                await self._update_airline_statistics(old_airline_code)
+            
+            return updated_review
+        except (ReviewNotFoundError, DatabaseError):
+            raise
+        except Exception as e:
+            raise DatabaseError(message=f"리뷰 수정 중 오류 발생: {e}")
+
+    async def delete_review(self, review_id: str, user_id: str) -> dict:
+        """
+        리뷰를 삭제합니다.
+        
+        Args:
+            review_id: 리뷰 ID
+            user_id: 사용자 ID (인증용)
+            
+        Returns:
+            삭제 성공 메시지
+            
+        Raises:
+            ReviewNotFoundError: 리뷰를 찾을 수 없을 때
+            DatabaseError: 권한이 없거나 오류 발생 시
+        """
+        try:
+            # 기존 리뷰 조회
+            doc_ref = self.reviews_collection.document(review_id)
+            doc = await run_in_threadpool(doc_ref.get)
+            
+            if not doc.exists:
+                raise ReviewNotFoundError(review_id=review_id)
+            
+            existing_data = doc.to_dict()
+            
+            # 사용자 권한 확인
+            if existing_data.get("userId") != user_id:
+                raise DatabaseError(message="리뷰를 삭제할 권한이 없습니다.")
+            
+            airline_code = existing_data.get("airlineCode")
+            
+            # 리뷰 삭제
+            await run_in_threadpool(doc_ref.delete)
+            
+            # 항공사 통계 업데이트
+            await self._update_airline_statistics(airline_code)
+            
+            return {
+                "message": "리뷰가 성공적으로 삭제되었습니다.",
+                "review_id": review_id
+            }
+        except (ReviewNotFoundError, DatabaseError):
+            raise
+        except Exception as e:
+            raise DatabaseError(message=f"리뷰 삭제 중 오류 발생: {e}")
+
+    async def _update_airline_statistics(self, airline_code: str):
+        """
+        항공사 코드 통계를 재계산하고 업데이트합니다.
+        
+        Args:
+            airline_code: 항공사 코드
+        """
+        try:
+            # 해당 항공사의 모든 리뷰 조회
+            query = self.reviews_collection.where("airlineCode", "==", airline_code)
+            docs = await run_in_threadpool(lambda: list(query.stream()))
+            
+            if not docs:
+                # 리뷰가 없으면 통계 초기화
+                stats = {
+                    "totalReviews": 0,
+                    "totalRatingSums": {},
+                    "averageRatings": {},
+                    "ratingBreakdown": {},
+                    "overallRating": 0.0
+                }
+            else:
+                # 카테고리별 평점 합계
+                rating_sums = {
+                    "seatComfort": 0,
+                    "inflightMeal": 0,
+                    "service": 0,
+                    "cleanliness": 0,
+                    "checkIn": 0
+                }
+                
+                # 전체 평점 합계
+                overall_rating_sum = 0.0
+                
+                # 평점 분포 (1점~5점)
+                rating_breakdown = {
+                    "1": 0,
+                    "2": 0,
+                    "3": 0,
+                    "4": 0,
+                    "5": 0
+                }
+                
+                # 리뷰 데이터 집계
+                for doc in docs:
+                    review_data = doc.to_dict()
+                    
+                    # 카테고리별 평점 누적
+                    ratings = review_data.get("ratings", {})
+                    for category in rating_sums.keys():
+                        rating_sums[category] += ratings.get(category, 0)
+                    
+                    # 전체 평점 누적
+                    overall = review_data.get("overallRating", 0.0)
+                    overall_rating_sum += overall
+                    
+                    # 평점 분포 계산 (반올림)
+                    rating_key = str(round(overall))
+                    if rating_key in rating_breakdown:
+                        rating_breakdown[rating_key] += 1
+                
+                # 평균 계산
+                total_reviews = len(docs)
+                average_ratings = {
+                    category: round(sum_value / total_reviews, 2)
+                    for category, sum_value in rating_sums.items()
+                }
+                
+                overall_rating = round(overall_rating_sum / total_reviews, 2)
+                
+                stats = {
+                    "totalReviews": total_reviews,
+                    "totalRatingSums": rating_sums,
+                    "averageRatings": average_ratings,
+                    "ratingBreakdown": rating_breakdown,
+                    "overallRating": overall_rating
+                }
+            
+            # airlines 컬렉션 업데이트
+            airline_ref = self.airlines_collection.document(airline_code)
+            await run_in_threadpool(lambda: airline_ref.update(stats))
+            
+        except Exception as e:
+            # 통계 업데이트 실패는 로그만 남기고 계속 진행
+            print(f"항공사 통계 업데이트 실패 ({airline_code}): {e}")
