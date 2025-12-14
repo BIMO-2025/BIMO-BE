@@ -24,9 +24,21 @@ class SocialLoginRequest(BaseModel):
 
 # --- 응답 스키마 ---
 
+class UserInfo(BaseModel):
+    """사용자 기본 정보 (응답용)"""
+    uid: str
+    email: str | None = None
+    display_name: str | None = None
+    photo_url: str | None = None
+    provider_id: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class TokenResponse(BaseModel):
-    """클라이언트에게 반환할 API Access Token"""
+    """클라이언트에게 반환할 API Access Token 및 사용자 정보"""
     access_token: str
     token_type: str = "bearer"
+    user: UserInfo | None = None  # 사용자 정보 (선택사항)
 
     model_config = ConfigDict(from_attributes=True)

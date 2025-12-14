@@ -87,7 +87,7 @@ class FirebaseAuthProvider(BaseAuthProvider, ABC):
         """
         uid = decoded_token.get("uid")
         email = decoded_token.get("email")
-        display_name = decoded_token.get("name")
+        display_name = cls._extract_display_name(decoded_token, provider_name)
         photo_url = decoded_token.get("picture")
         provider_id = decoded_token.get("firebase", {}).get("sign_in_provider")
 
