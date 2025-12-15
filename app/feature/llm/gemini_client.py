@@ -23,7 +23,7 @@ class GeminiClient:
             model_name = settings.GEMINI_MODEL_NAME
         self._genai = self._import_sdk()
         self._configure(api_key)
-        self.model_name = model_name or "gemini-1.5-flash"
+        self.model_name = model_name or "gemini-2.5-flash"
 
     @staticmethod
     def _import_sdk():
