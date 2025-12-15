@@ -387,8 +387,11 @@ class ReviewsService:
         """리뷰가 사진 필터 조건에 맞는지 확인"""
         if not photo_only:
             return True
-        
-        return review.imageUrl is not None and review.imageUrl != ""
+
+        # imageUrls(복수) 기준으로 판단 (구버전 imageUrl은 스키마에서 imageUrls로 정규화됨)
+        return bool(getattr(review, "imageUrls", None)) and any(
+            isinstance(u, str) and u.strip() for u in (review.imageUrls or [])
+        )
 
     async def get_filtered_reviews(
         self,
@@ -619,8 +622,10 @@ class ReviewsService:
             # 사진 리뷰 수집
             photo_urls = []
             for review in filtered_response.reviews:
-                if review.imageUrl:
-                    photo_urls.append(review.imageUrl)
+                # imageUrls(복수) 기준으로 갤러리 구성
+                for u in (review.imageUrls or []):
+                    if isinstance(u, str) and u.strip():
+                        photo_urls.append(u.strip())
             
             return DetailedReviewsResponse(
                 airline_code=airline_code,

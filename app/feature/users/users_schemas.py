@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, model_validator
 from datetime import datetime, timezone
 from app.feature.auth.auth_schemas import UserInfo
 
@@ -93,6 +93,33 @@ class UpdateProfilePhotoRequest(BaseModel):
     """프로필 사진 업데이트 요청 스키마"""
     userId: str = Field(..., description="사용자 ID")
     photo_url: str = Field(..., description="프로필 사진 URL")
+    # 하위 호환성(deprecated): 일부 클라이언트가 camelCase로 보낼 수 있음
+    photoUrl: str | None = Field(
+        default=None,
+        description="(deprecated) 프로필 사진 URL (camelCase). 대신 photo_url을 사용하세요.",
+        exclude=True,
+    )
+    photoURL: str | None = Field(
+        default=None,
+        description="(deprecated) 프로필 사진 URL (camelCase). 대신 photo_url을 사용하세요.",
+        exclude=True,
+    )
+
+    @model_validator(mode="before")
+    @classmethod
+    def _normalize_photo_url(cls, data):
+        if not isinstance(data, dict):
+            return data
+
+        def _clean(v):
+            return v.strip() if isinstance(v, str) and v.strip() else None
+
+        # 우선순위: photo_url > photoUrl > photoURL
+        photo_url = _clean(data.get("photo_url"))
+        photo_url = photo_url or _clean(data.get("photoUrl")) or _clean(data.get("photoURL"))
+        if photo_url is not None:
+            data["photo_url"] = photo_url
+        return data
     
     model_config = ConfigDict(
         from_attributes=True,

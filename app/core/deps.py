@@ -16,6 +16,17 @@ if TYPE_CHECKING:
     from app.feature.llm.gemini_client import GeminiClient
     from app.feature.offline.offline_service import OfflineService
 
+# NOTE:
+# FastAPI는 의존성 함수의 타입 힌트를 런타임에 eval 할 수 있습니다
+# (특히 Python 3.13 환경에서 inspect.signature(..., eval_str=True) 경로).
+# 따라서 ForwardRef("FirebaseService") 같은 문자열 타입을 쓰면,
+# 해당 심볼이 모듈 전역에 실제로 존재하지 않을 경우 NameError로 앱 부팅이 실패합니다.
+#
+# 순환 참조를 피하면서도 부팅을 안정화하기 위해, 핵심 타입은 런타임에도 import 해둡니다.
+from app.core.firebase import FirebaseService
+from app.core.clients.duffel import DuffelClient
+from app.feature.llm.gemini_client import GeminiClient
+
 
 # =============================================================================
 # 설정 의존성
@@ -30,7 +41,7 @@ def get_config() -> Settings:
 # 코어 서비스 의존성
 # =============================================================================
 
-def get_firebase_service() -> "FirebaseService":
+def get_firebase_service() -> FirebaseService:
     """
     Firebase 서비스 반환
     
@@ -41,7 +52,7 @@ def get_firebase_service() -> "FirebaseService":
     return _get_firebase()
 
 
-def get_duffel_client() -> "DuffelClient":
+def get_duffel_client() -> DuffelClient:
     """
     Duffel 클라이언트 반환
     
@@ -52,7 +63,7 @@ def get_duffel_client() -> "DuffelClient":
     return _get_duffel()
 
 
-def get_gemini_client() -> "GeminiClient":
+def get_gemini_client() -> GeminiClient:
     """
     Gemini 클라이언트 반환
     

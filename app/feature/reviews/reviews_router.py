@@ -3,14 +3,16 @@
 """
 from __future__ import annotations
 
-from fastapi import APIRouter, Query, HTTPException, Depends, BackgroundTasks
+from fastapi import APIRouter, Query, HTTPException, Depends, BackgroundTasks, Form, File, UploadFile
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from typing import Optional, Annotated
+from typing import Optional, Annotated, List
+import json
 
 from app.core.deps import get_firebase_service, get_gemini_client
 from app.core.firebase import FirebaseService
 from app.core.security import decode_access_token
 from app.core.exceptions.exceptions import InvalidTokenError
+from app.core.image_utils import convert_images_to_base64
 from app.feature.llm.gemini_client import GeminiClient
 from app.feature.reviews.reviews_service import ReviewsService
 from app.feature.reviews import reviews_schemas
@@ -119,61 +121,128 @@ async def get_detailed_reviews(
 
 @router.post("", response_model=reviews_schemas.ReviewSchema, status_code=201)
 async def create_review(
-    review: reviews_schemas.ReviewSchema,
-    background_tasks: BackgroundTasks,
+    userId: str = Form(...),
+    userNickname: str = Form(...),
+    airlineCode: str = Form(...),
+    airlineName: str = Form(...),
+    route: str = Form(...),
+    text: str = Form(...),
+    ratings: str = Form(..., description="JSON 형식의 평점 객체 (예: {\"seatComfort\":5,\"inflightMeal\":4,...})"),
+    overallRating: float = Form(..., ge=1, le=5),
+    flightNumber: Optional[str] = Form(None),
+    seatClass: Optional[str] = Form(None),
+    isVerified: bool = Form(False),
+    likes: int = Form(0),
+    images: List[UploadFile] = File(default=[]),
+    background_tasks: BackgroundTasks = None,
     credentials: HTTPAuthorizationCredentials = Depends(security),
     service: ReviewsService = Depends(get_reviews_service)
 ):
     """
-    새로운 리뷰를 생성합니다.
+    새로운 리뷰를 생성합니다 (multipart/form-data).
     
     - **인증 필요**: Bearer Token
+    - **이미지 자동 처리**: 업로드된 이미지를 자동으로 압축 후 Base64로 변환하여 저장
     - 리뷰 작성 시 항공사 통계가 자동으로 업데이트됩니다 (백그라운드에서 처리)
     
-    Request Body:
+    **Form Fields:**
     - userId: 사용자 ID
     - userNickname: 사용자 닉네임
     - airlineCode: 항공사 코드
     - airlineName: 항공사 이름
     - route: 노선 (예: "ICN-CDG")
+    - text: 리뷰 내용
+    - ratings: JSON 형식의 평점 객체 (예: {"seatComfort":5,"inflightMeal":4,"service":5,"cleanliness":4,"checkIn":5})
+    - overallRating: 전체 평점 (1~5)
     - flightNumber: 항공편 번호 (선택사항)
     - seatClass: 좌석 등급 (선택사항)
-    - imageUrl: 사진 URL (선택사항)
-    - ratings: 카테고리별 평점
-      - seatComfort: 좌석 편안함
-      - inflightMeal: 기내식
-      - service: 서비스
-      - cleanliness: 청결도
-      - checkIn: 체크인
-    - overallRating: 전체 평점 (1~5)
-    - text: 리뷰 내용
     - isVerified: 인증 여부 (기본값: false)
     - likes: 좋아요 수 (기본값: 0)
+    
+    **File Fields:**
+    - images: 리뷰 이미지 파일들 (최대 3개, jpg/png/webp 등)
+    
+    **사용 예시 (JavaScript):**
+    ```javascript
+    const formData = new FormData();
+    formData.append('userId', 'user123');
+    formData.append('userNickname', '여행자');
+    formData.append('airlineCode', 'KE');
+    formData.append('airlineName', '대한항공');
+    formData.append('route', 'ICN-CDG');
+    formData.append('text', '훌륭한 서비스!');
+    formData.append('ratings', JSON.stringify({
+      seatComfort: 5, inflightMeal: 4, service: 5, 
+      cleanliness: 4, checkIn: 5
+    }));
+    formData.append('overallRating', 4.5);
+    formData.append('images', imageFile1);
+    formData.append('images', imageFile2);
+    
+    fetch('/reviews', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer YOUR_TOKEN' },
+      body: formData
+    });
+    ```
     """
     try:
         # 토큰 검증
         token = credentials.credentials
-        payload = decode_access_token(token)  # 우리 서비스 JWT 디코딩
+        payload = decode_access_token(token)
         user_id = payload.get("sub")
         
         if not user_id:
             raise HTTPException(status_code=401, detail="유효하지 않은 토큰입니다.")
         
-        # 리뷰 생성
-        created_review = await service.create_review(review, user_id)
+        # 1. 이미지 파일들을 Base64로 변환 (최대 3개)
+        image_urls = []
+        if images:
+            images_to_convert = images[:3]  # 최대 3개만 처리
+            image_urls = await convert_images_to_base64(images_to_convert)
         
-        # 백그라운드에서 통계 업데이트
+        # 2. ratings JSON 파싱
+        try:
+            ratings_dict = json.loads(ratings)
+            ratings_obj = reviews_schemas.RatingsSchema(**ratings_dict)
+        except (json.JSONDecodeError, ValueError) as e:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"ratings 필드가 올바른 JSON 형식이 아닙니다: {str(e)}"
+            )
+        
+        # 3. ReviewSchema 객체 생성
+        review_data = reviews_schemas.ReviewSchema(
+            userId=userId,
+            userNickname=userNickname,
+            airlineCode=airlineCode,
+            airlineName=airlineName,
+            route=route,
+            text=text,
+            ratings=ratings_obj,
+            overallRating=overallRating,
+            flightNumber=flightNumber,
+            seatClass=seatClass,
+            isVerified=isVerified,
+            likes=likes,
+            imageUrls=image_urls
+        )
+        
+        # 4. 리뷰 생성
+        created_review = await service.create_review(review_data, user_id)
+        
+        # 5. 백그라운드 작업
         background_tasks.add_task(
             service._update_airline_statistics,
-            review.airlineCode
+            airlineCode
         )
-        # 백그라운드에서 BIMO 요약 업데이트
         background_tasks.add_task(
             service._update_bimo_summary,
-            review.airlineCode
+            airlineCode
         )
         
         return created_review
+        
     except HTTPException:
         raise
     except InvalidTokenError:
@@ -185,52 +254,112 @@ async def create_review(
 @router.put("/{review_id}", response_model=reviews_schemas.ReviewSchema)
 async def update_review(
     review_id: str,
-    review: reviews_schemas.ReviewSchema,
-    background_tasks: BackgroundTasks,
+    userId: str = Form(...),
+    userNickname: str = Form(...),
+    airlineCode: str = Form(...),
+    airlineName: str = Form(...),
+    route: str = Form(...),
+    text: str = Form(...),
+    ratings: str = Form(..., description="JSON 형식의 평점 객체"),
+    overallRating: float = Form(..., ge=1, le=5),
+    flightNumber: Optional[str] = Form(None),
+    seatClass: Optional[str] = Form(None),
+    isVerified: bool = Form(False),
+    likes: int = Form(0),
+    images: List[UploadFile] = File(default=[]),
+    keep_existing_images: bool = Form(True, description="기존 이미지 유지 여부 (true: 기존 이미지 + 새 이미지 추가, false: 새 이미지로 완전 교체)"),
+    background_tasks: BackgroundTasks = None,
     credentials: HTTPAuthorizationCredentials = Depends(security),
     service: ReviewsService = Depends(get_reviews_service)
 ):
     """
-    기존 리뷰를 수정합니다.
+    기존 리뷰를 수정합니다 (multipart/form-data).
     
     - **인증 필요**: Bearer Token (본인의 리뷰만 수정 가능)
+    - **이미지 자동 처리**: 업로드된 이미지를 자동으로 압축 후 Base64로 변환
     - 리뷰 수정 시 항공사 통계가 자동으로 업데이트됩니다 (백그라운드에서 처리)
-    - 항공사 코드 변경 시 이전 항공사와 새 항공사 모두 통계 업데이트
     
-    Path Parameters:
+    **Path Parameters:**
     - review_id: 리뷰 ID
     
-    Request Body는 create_review와 동일
+    **Form Fields:** create_review와 동일
+    - keep_existing_images: 기존 이미지 유지 여부 (기본값: true)
+      - true: 기존 이미지에 새 이미지 추가 (최대 3개까지)
+      - false: 기존 이미지 삭제하고 새 이미지로 교체
+    
+    **File Fields:**
+    - images: 추가할 이미지 파일들 (최대 3개)
     """
     try:
         # 토큰 검증
         token = credentials.credentials
-        payload = decode_access_token(token)  # 우리 서비스 JWT 디코딩
+        payload = decode_access_token(token)
         user_id = payload.get("sub")
         
         if not user_id:
             raise HTTPException(status_code=401, detail="유효하지 않은 토큰입니다.")
         
-        # 기존 리뷰 조회 (항공사 코드 변경 확인용)
+        # 1. 기존 리뷰 조회
         old_review = await service.get_review_by_id(review_id)
         old_airline_code = old_review.airlineCode
-        new_airline_code = review.airlineCode
         
-        # 리뷰 수정
-        updated_review = await service.update_review(review_id, review, user_id)
+        # 2. 이미지 처리
+        image_urls = []
         
-        # 백그라운드에서 통계 업데이트
+        # 기존 이미지 유지 옵션 처리
+        if keep_existing_images and old_review.imageUrls:
+            image_urls = list(old_review.imageUrls)  # 기존 이미지 복사
+        
+        # 새 이미지 추가
+        if images:
+            new_base64_images = await convert_images_to_base64(images)
+            image_urls.extend(new_base64_images)
+        
+        # 최대 3개까지만 유지
+        image_urls = image_urls[:3]
+        
+        # 3. ratings JSON 파싱
+        try:
+            ratings_dict = json.loads(ratings)
+            ratings_obj = reviews_schemas.RatingsSchema(**ratings_dict)
+        except (json.JSONDecodeError, ValueError) as e:
+            raise HTTPException(
+                status_code=400,
+                detail=f"ratings 필드가 올바른 JSON 형식이 아닙니다: {str(e)}"
+            )
+        
+        # 4. ReviewSchema 객체 생성
+        review_data = reviews_schemas.ReviewSchema(
+            userId=userId,
+            userNickname=userNickname,
+            airlineCode=airlineCode,
+            airlineName=airlineName,
+            route=route,
+            text=text,
+            ratings=ratings_obj,
+            overallRating=overallRating,
+            flightNumber=flightNumber,
+            seatClass=seatClass,
+            isVerified=isVerified,
+            likes=likes,
+            imageUrls=image_urls
+        )
+        
+        # 5. 리뷰 수정
+        updated_review = await service.update_review(review_id, review_data, user_id)
+        
+        # 6. 백그라운드 작업
         background_tasks.add_task(
             service._update_airline_statistics,
-            new_airline_code
+            airlineCode
         )
-        # 백그라운드에서 BIMO 요약 업데이트
         background_tasks.add_task(
             service._update_bimo_summary,
-            new_airline_code
+            airlineCode
         )
-        if old_airline_code != new_airline_code:
-            # 항공사 변경 시 이전 항공사도 업데이트
+        
+        # 항공사 변경 시 이전 항공사도 업데이트
+        if old_airline_code != airlineCode:
             background_tasks.add_task(
                 service._update_airline_statistics,
                 old_airline_code
@@ -241,6 +370,7 @@ async def update_review(
             )
         
         return updated_review
+        
     except HTTPException:
         raise
     except InvalidTokenError:

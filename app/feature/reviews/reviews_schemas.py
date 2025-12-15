@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, model_validator
 from typing import Optional, List, Dict
 from datetime import datetime, timezone
 
@@ -85,12 +85,52 @@ class ReviewSchema(BaseModel):
     flightNumber: Optional[str] = None  # 항공편 번호 (예: "KE901")
     seatClass: Optional[str] = None  # 좌석 등급 (예: "이코노미", "비즈니스", "퍼스트", "프리미엄 이코노미")
     imageUrls: List[str] = Field(default_factory=list, description="리뷰 이미지 URL 리스트 (0-3개)")
+    # 하위 호환성(deprecated): 예전 클라이언트/데이터는 imageUrl(단수)을 보낼 수 있음
+    # - 입력은 허용하되, 내부적으로 imageUrls로 통합하고 응답/저장에서는 제외(exclude=True)
+    imageUrl: Optional[str] = Field(
+        default=None,
+        description="(deprecated) 단일 리뷰 이미지 URL. 대신 imageUrls(리스트)를 사용하세요.",
+        exclude=True,
+    )
     ratings: RatingsSchema
     overallRating: float = Field(..., ge=1, le=5)
     text: str
     isVerified: bool = False
     likes: int = Field(0, description="좋아요 수", ge=0)
     createdAt: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    @model_validator(mode="before")
+    @classmethod
+    def _normalize_image_fields(cls, data):
+        """
+        imageUrl(단수) / imageUrls(복수) 혼용을 imageUrls(복수)로 정규화합니다.
+        - Firestore의 구버전 데이터나 구버전 클라이언트 요청을 깨지지 않게 하기 위함
+        """
+        if not isinstance(data, dict):
+            return data
+
+        image_urls = data.get("imageUrls")
+        image_url = data.get("imageUrl")
+
+        # imageUrls가 문자열로 들어오는 경우(실수/구버전) -> 리스트로 변환
+        if isinstance(image_urls, str):
+            image_urls = [image_urls]
+
+        # imageUrls가 비어있고 imageUrl만 있으면 -> imageUrls로 승격
+        if (not image_urls) and isinstance(image_url, str) and image_url.strip():
+            image_urls = [image_url]
+
+        # 최종 정리: 빈 값 제거 + 최대 3개 제한
+        if isinstance(image_urls, list):
+            cleaned = []
+            for u in image_urls:
+                if isinstance(u, str):
+                    u = u.strip()
+                    if u:
+                        cleaned.append(u)
+            data["imageUrls"] = cleaned[:3]
+
+        return data
 
     model_config = ConfigDict(
         from_attributes=True,
