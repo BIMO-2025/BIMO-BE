@@ -22,6 +22,8 @@ httpx>=0.25.0,<0.28.0
 # LLM (Gemini) - Google Generative AI
 google-generativeai>=0.3.0
 
+# 이미지 처리
+Pillow>=10.0.0
 
 # 시간대 처리 (시차적응 알고리즘)
 pytz>=2024.1
