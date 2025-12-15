@@ -7,11 +7,11 @@ from fastapi import APIRouter, Query, HTTPException, Depends, BackgroundTasks
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from typing import Optional, Annotated
 
-from app.core.deps import get_firebase_service, get_ollama_client
+from app.core.deps import get_firebase_service, get_gemini_client
 from app.core.firebase import FirebaseService
 from app.core.security import decode_access_token
 from app.core.exceptions.exceptions import InvalidTokenError
-from app.feature.llm.ollama_client import OllamaClient
+from app.feature.llm.gemini_client import GeminiClient
 from app.feature.reviews.reviews_service import ReviewsService
 from app.feature.reviews import reviews_schemas
 
@@ -26,14 +26,14 @@ security = HTTPBearer()
 
 def get_reviews_service(
     firebase_service = Depends(get_firebase_service),
-    ollama_client = Depends(get_ollama_client)
+    gemini_client = Depends(get_gemini_client)
 ) -> ReviewsService:
     """
     ReviewsService 인스턴스를 생성합니다.
     """
     return ReviewsService(
         firebase_service=firebase_service,
-        ollama_client=ollama_client
+        gemini_client=gemini_client
     )
 
 

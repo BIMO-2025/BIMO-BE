@@ -19,7 +19,8 @@ bcrypt==3.2.2
 # HTTP 클라이언트 (Kakao API, Duffel API 호출용)
 httpx>=0.25.0,<0.28.0
 
-# LLM (Ollama) - 로컬 실행, httpx는 이미 위에서 설치됨
+# LLM (Gemini) - Google Generative AI
+google-generativeai>=0.3.0
 
 
 # 시간대 처리 (시차적응 알고리즘)
