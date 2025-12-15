@@ -13,6 +13,7 @@ from app.feature.flights import flights_router, my_flights_router
 from app.feature.airlines import airline_router
 from app.feature.users import user_router
 from app.feature.flights.flights_router import search_router
+from app.feature.uploads import upload_router
 
 # 2. Firebase 초기화 실행
 from app.core import firebase
@@ -132,3 +133,4 @@ app.include_router(flights_router.router)
 app.include_router(my_flights_router.router)
 app.include_router(airline_router.router)
 app.include_router(search_router)  # POST /search/airlines
+app.include_router(upload_router.router)  # POST /uploads/images/base64
