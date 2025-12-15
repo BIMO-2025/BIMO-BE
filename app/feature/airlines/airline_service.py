@@ -85,7 +85,7 @@ class AirlineService:
                         country=data.get("country", ""),
                         alliance=data.get("alliance"),
                         type=data.get("type", "FSC"),
-                        rating=data.get("averageRatings", {}).get("overallRating", 0.0),
+                        rating=data.get("overallRating", 0.0),
                         review_count=data.get("totalReviews", 0),
                         logo_url=data.get("logoUrl"),
                     )
@@ -118,7 +118,7 @@ class AirlineService:
             # 1. 데이터 수집 및 평균 계산 준비
             for doc in docs:
                 data = doc.to_dict()
-                rating = data.get("averageRatings", {}).get("overallRating", 0.0)
+                rating = data.get("overallRating", 0.0)
                 review_count = data.get("totalReviews", 0)
                 
                 airline = Airline(
@@ -182,10 +182,9 @@ class AirlineService:
             start_date, end_date = self._get_week_date_range(year, month, week)
 
             # 1) 해당 기간 리뷰 조회
-            from google.cloud.firestore_v1.base_query import FieldFilter
             query = (
-                self.reviews_collection.where(filter=FieldFilter("createdAt", ">=", start_date))
-                .where(filter=FieldFilter("createdAt", "<", end_date))
+                self.reviews_collection.where("createdAt", ">=", start_date)
+                .where("createdAt", "<", end_date)
             )
             review_docs = await run_in_threadpool(lambda: list(query.stream()))
 
@@ -327,11 +326,6 @@ class AirlineService:
             
             data = doc.to_dict()
             
-            # 필수 필드 확인 및 기본값 설정
-            if "airlineName" not in data or not data["airlineName"]:
-                # airlineName이 없으면 문서가 유효하지 않은 것으로 간주
-                return None
-            
             # Firestore에 저장된 overallRating이 있으면 우선 사용, 없으면 계산
             if "overallRating" in data and data["overallRating"] is not None:
                 overall_rating = data["overallRating"]
@@ -407,47 +401,6 @@ class AirlineService:
             if isinstance(e, CustomException):
                 raise e
             raise DatabaseError(message=f"항공사 정렬 조회 중 오류 발생: {e}")
-    
-    async def get_airline_with_bimo(self, airline_code: str) -> Optional[AirlineSchema]:
-        """
-        항공사 정보와 BIMO 요약을 함께 조회합니다.
-        
-        Args:
-            airline_code: 항공사 코드
-            
-        Returns:
-            AirlineSchema (bimoSummary 포함, 없으면 None)
-        """
-        try:
-            doc_ref = self.airlines_collection.document(airline_code)
-            doc = await run_in_threadpool(doc_ref.get)
-            
-            if not doc.exists:
-                return None
-            
-            data = doc.to_dict()
-            
-            # overallRating 계산
-            if "overallRating" in data and data["overallRating"] is not None:
-                overall_rating = data["overallRating"]
-            else:
-                avg_ratings = data.get("averageRatings", {})
-                if avg_ratings:
-                    overall_rating = round(sum(avg_ratings.values()) / len(avg_ratings), 2)
-                else:
-                    overall_rating = 0.0
-                data["overallRating"] = overall_rating
-            
-            # BIMO 요약 포함 (Firebase에 저장된 값 사용)
-            # bimoSummary가 없으면 None으로 설정 (백그라운드에서 갱신됨)
-            if "bimoSummary" not in data:
-                data["bimoSummary"] = None
-            
-            return AirlineSchema(**data)
-        except Exception as e:
-            if isinstance(e, CustomException):
-                raise e
-            raise DatabaseError(message=f"항공사 정보 조회 중 오류 발생: {e}")
     
     # Private helper methods
     
