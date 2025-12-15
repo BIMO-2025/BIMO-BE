@@ -47,3 +47,39 @@ class UpdateNicknameResponse(BaseModel):
     user: UserInfo
 
     model_config = ConfigDict(from_attributes=True)
+
+
+# --- 수면 패턴 업데이트 관련 스키마 ---
+
+class UpdateSleepPatternRequest(BaseModel):
+    """수면 패턴 업데이트 요청 스키마"""
+    sleepPatternStart: str = Field(
+        ..., 
+        description="수면 시작 시간 (HH:MM 형식)",
+        pattern=r"^([0-1][0-9]|2[0-3]):[0-5][0-9]$"
+    )
+    sleepPatternEnd: str = Field(
+        ..., 
+        description="수면 종료 시간 (HH:MM 형식)",
+        pattern=r"^([0-1][0-9]|2[0-3]):[0-5][0-9]$"
+    )
+    
+    model_config = ConfigDict(
+        from_attributes=True,
+        json_schema_extra={
+            "example": {
+                "sleepPatternStart": "23:00",
+                "sleepPatternEnd": "07:00"
+            }
+        }
+    )
+
+
+class UpdateSleepPatternResponse(BaseModel):
+    """수면 패턴 업데이트 응답 스키마"""
+    success: bool
+    message: str
+    sleepPatternStart: str = Field(..., description="업데이트된 수면 시작 시간")
+    sleepPatternEnd: str = Field(..., description="업데이트된 수면 종료 시간")
+    
+    model_config = ConfigDict(from_attributes=True)
