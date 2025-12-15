@@ -325,16 +325,16 @@ def convert_my_flight_to_segment(my_flight: MyFlightSchema) -> List[FlightSegmen
                 arr_time = arr_time_str
         else:
             raise ValueError(f"segment의 arrival 정보 형식이 올바르지 않습니다: {type(arrival_info)}")
-        
-        # 비행 시간 계산
+    
+    # 비행 시간 계산
         duration = (arr_time - dep_time).total_seconds() / 3600
-        
+    
         flight_segments.append(FlightSegment(
             departure_airport=dep_airport,
             arrival_airport=arr_airport,
             departure_time=dep_time,
             arrival_time=arr_time,
-            flight_duration_hours=duration
+        flight_duration_hours=duration
         ))
     
     return flight_segments

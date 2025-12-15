@@ -3,16 +3,25 @@ pytest 설정 및 공통 픽스처
 """
 import os
 import pytest
+from pathlib import Path
 from unittest.mock import Mock, patch, MagicMock
 from fastapi.testclient import TestClient
 from datetime import datetime, timezone
+from dotenv import load_dotenv
 
-# 테스트 환경 변수 설정
+# .env 파일 로드 (프로젝트 루트에서)
+# 주의: setdefault보다 먼저 실행되어야 .env의 값이 우선됩니다
+env_path = Path(__file__).parent.parent / ".env"
+if env_path.exists():
+    load_dotenv(env_path, override=False)  # override=False: 이미 설정된 환경 변수는 유지
+
+# 테스트 환경 변수 설정 (기본값, .env에 없을 때만 사용)
 os.environ.setdefault("API_SECRET_KEY", "test-secret-key-for-testing-only")
 os.environ.setdefault("API_TOKEN_ALGORITHM", "HS256")
 os.environ.setdefault("API_TOKEN_EXPIRE_MINUTES", "30")
 os.environ.setdefault("GEMINI_API_KEY", "test-gemini-key")
 os.environ.setdefault("GEMINI_MODEL_NAME", "gemini-1.5-flash")
+# FIREBASE_SERVICE_ACCOUNT_KEY는 .env에서 로드되거나, 없으면 기본값 사용
 os.environ.setdefault("FIREBASE_SERVICE_ACCOUNT_KEY", "./firebase_service_key.json")
 
 from app.main import app
