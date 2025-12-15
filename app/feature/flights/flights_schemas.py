@@ -481,6 +481,8 @@ class AirlineSearchResponseItem(BaseModel):
     flight_number: str = Field(..., description="항공편명 (첫 번째 구간의 항공편명, 예: KE123)")
     total_duration: str = Field(..., description="총 비행 시간 (예: 14H30M)")
     segments: List[SegmentDetailSchema] = Field(..., description="각 구간별 비행 시간 및 정보 (경유일 경우 여러 개)")
+    overall_rating: Optional[float] = Field(None, description="항공사 전체 평점 (Firestore에서 조회, 없으면 null)")
+    total_reviews: Optional[int] = Field(None, description="총 리뷰 수 (Firestore에서 조회, 없으면 null)")
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -490,6 +492,8 @@ class AirlineSearchResponseItem(BaseModel):
                 "has_stopover": False,
                 "flight_number": "KE123",
                 "total_duration": "14H30M",
+                "overall_rating": 4.2,
+                "total_reviews": 1250,
                 "segments": [
                     {
                         "operating_carrier": "KE",

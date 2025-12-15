@@ -70,7 +70,7 @@ async def get_airline_detail(
     
     - **airline_code**: 항공사 코드 (예: KE, AF, SQ)
     """
-    airline = await service.get_airline_with_bimo(airline_code)
+    airline = await service.get_airline_statistics(airline_code)
     if not airline:
         raise HTTPException(status_code=404, detail="항공사를 찾을 수 없습니다.")
     return airline
