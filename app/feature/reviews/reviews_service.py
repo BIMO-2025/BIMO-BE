@@ -318,12 +318,26 @@ class ReviewsService:
 
         def _safe_parse(raw_text: str) -> tuple[list[str], list[str]]:
             try:
-                data = json.loads(raw_text.strip())
+                # 원본 텍스트 정제
+                text = raw_text.strip()
+                
+                # 마크다운 코드 블록 제거
+                if "```json" in text:
+                    text = text.split("```json")[1].split("```")[0].strip()
+                elif "```" in text:
+                    text = text.split("```")[1].split("```")[0].strip()
+                
+                # JSON 파싱
+                data = json.loads(text)
                 good = data.get("good_points") or []
                 bad = data.get("bad_points") or []
+                
+                print(f"✓ JSON 파싱 성공: Good {len(good)}개, Bad {len(bad)}개")
                 return list(good), list(bad)
-            except Exception:
-                # 간단한 fallback: 줄바꿈 기준으로 good/bad 추정하지 않고 빈 리스트로 처리
+            except Exception as e:
+                # 에러 로깅
+                print(f"✗ JSON 파싱 실패: {e}")
+                print(f"원본 응늵 (처음 500자): {raw_text[:500]}")
                 return [], []
 
         good_points, bad_points = _safe_parse(raw)
@@ -657,9 +671,6 @@ class ReviewsService:
             created_data["id"] = created_doc.id
             created_review = ReviewSchema(**created_data)
             
-            # 항공사 통계 업데이트
-            await self._update_airline_statistics(review_data.airlineCode)
-            
             return created_review
         except Exception as e:
             if isinstance(e, CustomException):
@@ -711,12 +722,6 @@ class ReviewsService:
             updated_data["id"] = updated_doc.id
             updated_review = ReviewSchema(**updated_data)
             
-            # 항공사 통계 업데이트
-            await self._update_airline_statistics(new_airline_code)
-            if airline_changed:
-                # 이전 항공사의 통계도 업데이트
-                await self._update_airline_statistics(old_airline_code)
-            
             return updated_review
         except (ReviewNotFoundError, DatabaseError):
             raise
@@ -756,9 +761,6 @@ class ReviewsService:
             
             # 리뷰 삭제
             await run_in_threadpool(doc_ref.delete)
-            
-            # 항공사 통계 업데이트
-            await self._update_airline_statistics(airline_code)
             
             return {
                 "message": "리뷰가 성공적으로 삭제되었습니다.",
@@ -854,3 +856,35 @@ class ReviewsService:
         except Exception as e:
             # 통계 업데이트 실패는 로그만 남기고 계속 진행
             print(f"항공사 통계 업데이트 실패 ({airline_code}): {e}")
+
+    async def _update_bimo_summary(self, airline_code: str):
+        """
+        항공사의 BIMO AI 요약을 재생성하고 airlines 컬렉션에 저장합니다.
+        
+        Args:
+            airline_code: 항공사 코드
+        """
+        try:
+            # BIMO 요약 생성
+            summary_response = await self.generate_bimo_summary(airline_code)
+            
+            # airlines 컬렉션에 저장할 데이터
+            bimo_data = {
+                "bimoSummary": {
+                    "goodPoints": summary_response.good_points,
+                    "badPoints": summary_response.bad_points,
+                    "reviewCount": summary_response.review_count,
+                    "lastUpdated": datetime.now(timezone.utc)
+                }
+            }
+            
+            # airlines 컬렉션 업데이트
+            airline_ref = self.airlines_collection.document(airline_code)
+            await run_in_threadpool(lambda: airline_ref.update(bimo_data))
+            
+            print(f"✓ BIMO 요약 업데이트 완료 ({airline_code}): Good {len(summary_response.good_points)}개, Bad {len(summary_response.bad_points)}개")
+            
+        except Exception as e:
+            # BIMO 요약 업데이트 실패는 로그만 남기고 계속 진행
+            print(f"BIMO 요약 업데이트 실패 ({airline_code}): {e}")
+

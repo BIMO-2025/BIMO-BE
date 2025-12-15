@@ -65,31 +65,18 @@ async def get_airline_detail(
     - 기본 정보 (이름, 로고, 이미지)
     - 평점 정보 (전체 평균, 카테고리별 평균)
     - 집계 통계 (리뷰 수, 점수 분포)
+    - BIMO 요약 (Good/Bad 포인트) <- 추가!
     - 기본 정보 (본사 위치, 허브 공항, 항공 동맹, 운항 클래스)
     
     - **airline_code**: 항공사 코드 (예: KE, AF, SQ)
     """
-    airline = await service.get_airline_statistics(airline_code)
+    airline = await service.get_airline_with_bimo(airline_code)
     if not airline:
         raise HTTPException(status_code=404, detail="항공사를 찾을 수 없습니다.")
     return airline
 
 
-@router.get("/{airline_code}/statistics", response_model=AirlineSchema)
-async def get_airline_statistics(
-    airline_code: str,
-    service = Depends(get_airline_service)
-):
-    """
-    항공사의 집계된 통계 정보만 조회합니다.
-    Cloud Function에 의해 자동 업데이트되는 데이터입니다.
-    
-    - **airline_code**: 항공사 코드
-    """
-    stats = await service.get_airline_statistics(airline_code)
-    if not stats:
-        raise HTTPException(status_code=404, detail="항공사를 찾을 수 없습니다.")
-    return stats
+
 
 
 @router.get("/{airline_code}/reviews", response_model=AirlineReviewsResponse)
@@ -118,18 +105,5 @@ async def get_airline_reviews_page(
     )
 
 
-@router.get("/{airline_code}/summary", response_model=BIMOSummaryResponse)
-async def get_bimo_summary(
-    airline_code: str,
-    reviews_service: ReviewsService = Depends(get_reviews_service)
-):
-    """
-    BIMO 요약 정보를 조회합니다 (LLM 기반).
-    Good/Bad 포인트를 분리하여 반환합니다.
-    
-    - **airline_code**: 항공사 코드
-    
-    평점 관련 요청과 별도로 호출됩니다.
-    """
-    return await reviews_service.generate_bimo_summary(airline_code)
+
 
