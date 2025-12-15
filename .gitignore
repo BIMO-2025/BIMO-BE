@@ -214,3 +214,22 @@ firebase_service_key.json
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Project specific
+# Artifacts and temporary files
+artifacts/logs/
+artifacts/temp/
+artifacts/*.txt
+artifacts/*.json
+*.result.txt
+*_log.txt
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Temporary request/response files
+temp_*.json
+*_request.json
+*_response.json
