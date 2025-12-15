@@ -26,10 +26,9 @@ class Settings(BaseSettings):
     GEMINI_API_KEY: Optional[str] = None
     GEMINI_MODEL_NAME: str = "gemini-1.5-flash"
 
-    # Amadeus API 설정
-    AMADEUS_API_KEY: Optional[str] = None
-    AMADEUS_API_SECRET: Optional[str] = None
-    AMADEUS_ENVIRONMENT: str = "test"
+    # Duffel API 설정
+    DUFFEL_API_KEY: Optional[str] = None
+    DUFFEL_ENVIRONMENT: str = "test"
 
     # Google OAuth 설정 (iOS)
     GOOGLE_IOS_CLIENT_ID: Optional[str] = None
