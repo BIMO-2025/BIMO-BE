@@ -12,6 +12,7 @@ from app.feature.offline import offline_router
 from app.feature.flights import flights_router, my_flights_router
 from app.feature.airlines import airline_router
 from app.feature.users import user_router
+from app.feature.flights.flights_router import search_router
 
 # 2. Firebase 초기화 실행
 from app.core import firebase
@@ -49,10 +50,10 @@ async def lifespan(app: FastAPI):
     app.state.firebase_service = firebase_service
     print("[OK] Firebase initialized")
     
-    # Amadeus 클라이언트 (lazy initialization으로 필요시 초기화됨)
-    from app.core.clients.amadeus import get_amadeus_client
-    app.state.amadeus_client = get_amadeus_client()
-    print("[OK] Amadeus client ready")
+    # Duffel 클라이언트 (lazy initialization으로 필요시 초기화됨)
+    from app.core.clients.duffel import get_duffel_client
+    app.state.duffel_client = get_duffel_client()
+    print("[OK] Duffel client ready")
     
     # Gemini 클라이언트 (lazy initialization으로 필요시 초기화됨)
     from app.feature.llm.gemini_client import get_gemini_client
@@ -130,3 +131,4 @@ app.include_router(offline_router.router)
 app.include_router(flights_router.router)
 app.include_router(my_flights_router.router)
 app.include_router(airline_router.router)
+app.include_router(search_router)  # POST /search/airlines

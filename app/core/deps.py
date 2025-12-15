@@ -12,7 +12,7 @@ from app.core.config import get_settings, Settings
 if TYPE_CHECKING:
     from app.core.network_monitor import NetworkMonitor
     from app.core.firebase import FirebaseService
-    from app.core.clients.amadeus import AmadeusClient
+    from app.core.clients.duffel import DuffelClient
     from app.feature.llm.gemini_client import GeminiClient
     from app.feature.offline.offline_service import OfflineService
 
@@ -41,15 +41,15 @@ def get_firebase_service() -> "FirebaseService":
     return _get_firebase()
 
 
-def get_amadeus_client() -> "AmadeusClient":
+def get_duffel_client() -> "DuffelClient":
     """
-    Amadeus 클라이언트 반환
+    Duffel 클라이언트 반환
     
     Returns:
-        AmadeusClient 인스턴스
+        DuffelClient 인스턴스
     """
-    from app.core.clients.amadeus import get_amadeus_client as _get_amadeus
-    return _get_amadeus()
+    from app.core.clients.duffel import get_duffel_client as _get_duffel
+    return _get_duffel()
 
 
 def get_gemini_client() -> "GeminiClient":

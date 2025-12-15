@@ -284,3 +284,132 @@ class LocationSearchResponse(BaseModel):
             }
         }
     )
+
+
+# ===========================================================================
+# 항공사 검색 관련 스키마 (Duffel API용)
+# ===========================================================================
+
+
+class AirlineSearchRequest(BaseModel):
+    """
+    항공사 검색 요청 스키마 (Duffel API용)
+    """
+    departure: str = Field(..., description="출발지 공항 IATA 코드 (예: ICN)", min_length=3, max_length=3)
+    arrive: str = Field(..., description="도착지 공항 IATA 코드 (예: JFK)", min_length=3, max_length=3)
+    departure_date: str = Field(..., description="출발 날짜 (YYYY-MM-DD 형식)", pattern=r"^\d{4}-\d{2}-\d{2}$")
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "departure": "ICN",
+                "arrive": "JFK",
+                "departure_date": "2025-12-30"
+            }
+        }
+    )
+
+
+class SegmentDetailSchema(BaseModel):
+    """
+    각 구간의 상세 정보
+    """
+    operating_carrier: str = Field(..., description="운항 항공사 코드 (예: KE)")
+    flight_number: str = Field(..., description="항공편명 (예: KE123)")
+    duration: str = Field(..., description="구간 비행 시간 (예: PT14H30M 또는 14H30M)")
+    departure: Dict = Field(..., description="출발 정보 (공항 코드, 시간 등)")
+    arrival: Dict = Field(..., description="도착 정보 (공항 코드, 시간 등)")
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "operating_carrier": "KE",
+                "flight_number": "KE123",
+                "duration": "14H30M",
+                "departure": {
+                    "iata_code": "ICN",
+                    "at": "2025-12-30T10:00:00Z"
+                },
+                "arrival": {
+                    "iata_code": "JFK",
+                    "at": "2025-12-30T14:30:00Z"
+                }
+            }
+        }
+    )
+
+
+class AirlineSearchResponseItem(BaseModel):
+    """
+    항공사 검색 결과 항목
+    """
+    operating_carrier: str = Field(..., description="운항 항공사 코드 (owner가 아닌 실제 운항 항공사)")
+    has_stopover: bool = Field(..., description="경유 여부")
+    flight_number: str = Field(..., description="항공편명 (첫 번째 구간의 항공편명, 예: KE123)")
+    total_duration: str = Field(..., description="총 비행 시간 (예: 14H30M)")
+    segments: List[SegmentDetailSchema] = Field(..., description="각 구간별 비행 시간 및 정보 (경유일 경우 여러 개)")
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "operating_carrier": "KE",
+                "has_stopover": False,
+                "flight_number": "KE123",
+                "total_duration": "14H30M",
+                "segments": [
+                    {
+                        "operating_carrier": "KE",
+                        "flight_number": "KE123",
+                        "duration": "14H30M",
+                        "departure": {
+                            "iata_code": "ICN",
+                            "at": "2025-12-30T10:00:00Z"
+                        },
+                        "arrival": {
+                            "iata_code": "JFK",
+                            "at": "2025-12-30T14:30:00Z"
+                        }
+                    }
+                ]
+            }
+        }
+    )
+
+
+class AirlineSearchResponse(BaseModel):
+    """
+    항공사 검색 응답 스키마
+    """
+    count: int = Field(..., description="검색된 항공편 개수")
+    results: List[AirlineSearchResponseItem] = Field(..., description="검색된 항공편 목록")
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "count": 1,
+                "results": [
+                    {
+                        "operating_carrier": "KE",
+                        "has_stopover": False,
+                        "flight_number": "KE123",
+                        "total_duration": "14H30M",
+                        "segments": [
+                            {
+                                "operating_carrier": "KE",
+                                "flight_number": "KE123",
+                                "duration": "14H30M",
+                                "departure": {
+                                    "iata_code": "ICN",
+                                    "at": "2025-12-30T10:00:00Z"
+                                },
+                                "arrival": {
+                                    "iata_code": "JFK",
+                                    "at": "2025-12-30T14:30:00Z"
+                                }
+                            }
+                        ]
+                    }
+                ]
+            }
+        }
+    )
