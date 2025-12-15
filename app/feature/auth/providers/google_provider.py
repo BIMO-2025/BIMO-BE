@@ -109,11 +109,12 @@ class GoogleAuthProvider(FirebaseAuthProvider):
         # 2. 사용자 조회 또는 생성
         user = await cls.get_or_create_user(decoded_token, fcm_token=fcm_token)
 
-        # 3. API 토큰 생성
-        api_access_token = cls.generate_api_token(uid=user.uid)
+        # 3. API 토큰 생성 (Access Token + Refresh Token)
+        tokens = cls.generate_api_token(uid=user.uid)
 
         return {
-            "access_token": api_access_token,
+            "access_token": tokens["access_token"],
+            "refresh_token": tokens["refresh_token"],
             "token_type": "bearer",
             "user": user
         }

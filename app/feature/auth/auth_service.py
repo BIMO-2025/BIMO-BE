@@ -3,11 +3,17 @@
 각 프로바이더별 인증 로직을 통합 관리합니다.
 """
 
+from fastapi.concurrency import run_in_threadpool
 from app.feature.auth.providers import (
     GoogleAuthProvider,
     AppleAuthProvider,
     KakaoAuthProvider,
 )
+from app.core.security import decode_refresh_token, create_access_token
+from app.core.firebase import db
+from app.core.exceptions.exceptions import InvalidTokenError, UserProfileNotFoundError, DatabaseError, CustomException
+
+user_collection = db.collection("users")
 
 # ============================================
 # 각 프로바이더별 인증 함수
@@ -109,10 +115,61 @@ async def verify_kakao_token(token: str) -> dict:
     return await KakaoAuthProvider.verify_token(token)
 
 
+async def refresh_access_token(refresh_token: str) -> dict:
+    """
+    Refresh Token을 검증하여 새로운 Access Token을 발급합니다.
+    
+    Args:
+        refresh_token: 클라이언트로부터 받은 Refresh Token
+        
+    Returns:
+        {
+            "access_token": "새로운 JWT Access Token",
+            "token_type": "bearer"
+        }
+        
+    Raises:
+        InvalidTokenError: 토큰이 유효하지 않거나 사용자 식별자가 없을 때
+        TokenExpiredError: 토큰이 만료되었을 때
+        UserNotFoundError: 사용자가 존재하지 않을 때
+        DatabaseError: 사용자 확인 중 오류 발생
+    """
+    # 1. Refresh Token 검증 및 디코딩
+    payload = decode_refresh_token(refresh_token)
+    uid = payload.get("sub")
+    
+    if not uid:
+        raise InvalidTokenError(message="토큰에 사용자 식별자가 없습니다.")
+
+    # 2. 사용자 존재 여부 확인 (Firestore)
+    try:
+        user_ref = user_collection.document(uid)
+        user_doc = await run_in_threadpool(user_ref.get)
+        
+        if not user_doc.exists:
+            raise UserProfileNotFoundError()
+            
+        # 필요한 경우 사용자 상태(활성/정지 등)를 여기서 체크할 수 있습니다.
+        
+    except Exception as e:
+        if isinstance(e, CustomException):
+            raise e
+        raise DatabaseError(message=f"사용자 확인 중 오류 발생: {e}")
+
+    # 3. 새로운 Access Token 발급
+    new_access_token = create_access_token(data={"sub": uid})
+    
+    return {
+        "access_token": new_access_token,
+        "token_type": "bearer"
+    }
+
+
 def generate_api_token(uid: str) -> str:
     """
     [레거시 함수] 우리 서비스 전용 API Access Token (JWT)을 생성합니다.
     
     Deprecated: 각 프로바이더의 generate_api_token 메서드 사용을 권장합니다.
     """
-    return GoogleAuthProvider.generate_api_token(uid)
+    tokens = GoogleAuthProvider.generate_api_token(uid)
+    return tokens["access_token"]  # 하위 호환성을 위해 access_token만 반환

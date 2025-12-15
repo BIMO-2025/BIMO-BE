@@ -62,6 +62,42 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     return encoded_jwt
 
 
+def create_refresh_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
+    """
+    Refresh Token (JWT)을 생성합니다.
+
+    :param data: JWT payload에 포함될 데이터 (e.g., {"sub": user_uid})
+    :param expires_delta: 토큰 만료 시간 (timedelta). None이면 .env의 기본값(7일) 사용.
+    :return: 인코딩된 JWT (str)
+    """
+    to_encode = data.copy()
+
+    # 토큰 만료 시간 설정
+    if expires_delta:
+        expire = datetime.now(timezone.utc) + expires_delta
+    else:
+        # .env에서 설정한 기본 만료 시간을 사용 (기본값: 7일)
+        expire = datetime.now(timezone.utc) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
+
+    # 토큰 발급 시간(iat)과 만료 시간(exp), 토큰 타입을 payload에 추가
+    to_encode.update({
+        "exp": expire,
+        "iat": datetime.now(timezone.utc),
+        "type": "refresh"  # 토큰 타입 명시
+    })
+
+    # .env 파일에 키가 설정되었는지 확인
+    if not settings.API_SECRET_KEY or not settings.API_TOKEN_ALGORITHM:
+        raise AppConfigError(
+            "JWT 설정(API_SECRET_KEY, API_TOKEN_ALGORITHM)이 필요합니다. .env 파일을 확인하세요."
+        )
+
+    # JWT 토큰 인코딩
+    encoded_jwt = jwt.encode(to_encode, settings.API_SECRET_KEY, algorithm=settings.API_TOKEN_ALGORITHM)
+
+    return encoded_jwt
+
+
 def decode_access_token(token: str) -> dict:
     """
     API Access Token (JWT)을 디코딩하고 검증합니다.
@@ -96,6 +132,47 @@ def decode_access_token(token: str) -> dict:
         raise InvalidTokenError()
     except Exception:
         # 예상치 못한 기타 오류
+        raise InvalidTokenError(message="토큰 디코딩 중 알 수 없는 오류가 발생했습니다.")
+
+
+def decode_refresh_token(token: str) -> dict:
+    """
+    Refresh Token (JWT)을 디코딩하고 검증합니다.
+    
+    :param token: 검증할 Refresh Token
+    :return: 디코딩된 payload (e.g., {"sub": user_uid, "exp": ..., "iat": ..., "type": "refresh"})
+    :raises TokenExpiredError: 토큰이 만료되었을 때
+    :raises InvalidTokenError: 토큰이 유효하지 않을 때 (서명, 형식, 타입 오류 등)
+    """
+    # JWT 설정값 확인
+    if not settings.API_SECRET_KEY or not settings.API_TOKEN_ALGORITHM:
+        raise AppConfigError(
+            "JWT 설정(API_SECRET_KEY, API_TOKEN_ALGORITHM)이 필요합니다. .env 파일을 확인하세요."
+        )
+
+    try:
+        # JWT 디코딩 시도
+        payload = jwt.decode(
+            token,
+            settings.API_SECRET_KEY,
+            algorithms=[settings.API_TOKEN_ALGORITHM]
+        )
+        
+        # 토큰 타입 확인 (refresh token인지 검증)
+        if payload.get("type") != "refresh":
+            raise InvalidTokenError(message="유효하지 않은 토큰 타입입니다.")
+        
+        return payload
+    except jwt.ExpiredSignatureError:
+        # 토큰 만료 시
+        raise TokenExpiredError()
+    except JWTError:
+        # 그 외 모든 JWT 관련 에러 (서명 불일치, 형식 오류 등)
+        raise InvalidTokenError()
+    except Exception as e:
+        # 예상치 못한 기타 오류
+        if isinstance(e, (TokenExpiredError, InvalidTokenError)):
+            raise e
         raise InvalidTokenError(message="토큰 디코딩 중 알 수 없는 오류가 발생했습니다.")
 
 

@@ -36,9 +36,25 @@ class UserInfo(BaseModel):
 
 
 class TokenResponse(BaseModel):
-    """클라이언트에게 반환할 API Access Token 및 사용자 정보"""
+    """클라이언트에게 반환할 API Access Token, Refresh Token 및 사용자 정보"""
     access_token: str
+    refresh_token: str
     token_type: str = "bearer"
     user: UserInfo | None = None  # 사용자 정보 (선택사항)
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class RefreshTokenRequest(BaseModel):
+    """Access Token 재발급 요청 스키마"""
+    refresh_token: str
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class AccessTokenResponse(BaseModel):
+    """Access Token 재발급 응답 스키마"""
+    access_token: str
+    token_type: str = "bearer"
 
     model_config = ConfigDict(from_attributes=True)
