@@ -619,7 +619,7 @@ class ReviewsService:
             # 사진 리뷰 수집
             photo_urls = []
             for review in filtered_response.reviews:
-                if review.imageUrl:
+                if hasattr(review, 'imageUrl') and review.imageUrl:
                     photo_urls.append(review.imageUrl)
             
             return DetailedReviewsResponse(

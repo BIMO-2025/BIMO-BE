@@ -10,7 +10,7 @@ from typing import Optional, Annotated
 from app.core.deps import get_firebase_service, get_gemini_client
 from app.core.firebase import FirebaseService
 from app.core.security import decode_access_token
-from app.core.exceptions.exceptions import InvalidTokenError
+from app.core.exceptions.exceptions import InvalidTokenError, CustomException
 from app.feature.llm.gemini_client import GeminiClient
 from app.feature.reviews.reviews_service import ReviewsService
 from app.feature.reviews import reviews_schemas
@@ -113,8 +113,15 @@ async def get_detailed_reviews(
             limit=limit,
             offset=offset
         )
+    except HTTPException:
+        # FastAPI 표준 예외는 그대로 전달
+        raise
+    except CustomException:
+        # CustomException(DatabaseError 등)은 app-level handler에서 표준 포맷으로 처리되도록 그대로 올립니다.
+        raise
     except Exception as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        # 그 외 알 수 없는 예외는 500으로 노출
+        raise HTTPException(status_code=500, detail=f"서버 오류가 발생했습니다: {str(e)}")
 
 
 @router.post("", response_model=reviews_schemas.ReviewSchema, status_code=201)
