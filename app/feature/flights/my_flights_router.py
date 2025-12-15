@@ -8,9 +8,10 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 from app.feature.flights.flights_schemas import MyFlightSchema
 from app.feature.flights.my_flights_service import MyFlightsService
-from app.core.security import verify_firebase_token
+from app.core.security import decode_access_token
 from app.core.deps import get_firebase_service
 from app.core.firebase import FirebaseService
+from app.core.exceptions.exceptions import InvalidTokenError
 
 router = APIRouter(
     prefix="/users/{user_id}/my-flights",
@@ -33,7 +34,7 @@ async def get_current_user_id(
     user_id: str = None
 ) -> str:
     """
-    Firebase 토큰에서 사용자 ID를 추출하고 검증합니다.
+    JWT 토큰에서 사용자 ID를 추출하고 검증합니다.
     
     Args:
         credentials: HTTP Bearer 토큰
@@ -46,18 +47,26 @@ async def get_current_user_id(
         HTTPException: 토큰이 유효하지 않거나 사용자 ID가 일치하지 않는 경우
     """
     token = credentials.credentials
-    decoded_token = verify_firebase_token(token)
     
-    token_user_id = decoded_token.get("uid")
-    
-    # 경로의 user_id와 토큰의 user_id가 일치하는지 확인
-    if user_id and token_user_id != user_id:
-        raise HTTPException(
-            status_code=403,
-            detail="이 리소스에 접근할 권한이 없습니다"
-        )
-    
-    return token_user_id or user_id
+    try:
+        # 우리 서비스 JWT 토큰 디코딩
+        payload = decode_access_token(token)
+        token_user_id = payload.get("sub")
+        
+        if not token_user_id:
+            raise HTTPException(status_code=401, detail="유효하지 않은 토큰입니다.")
+        
+        # 경로의 user_id와 토큰의 user_id가 일치하는지 확인
+        if user_id and token_user_id != user_id:
+            raise HTTPException(
+                status_code=403,
+                detail="이 리소스에 접근할 권한이 없습니다"
+            )
+        
+        return token_user_id or user_id
+        
+    except InvalidTokenError:
+        raise HTTPException(status_code=401, detail="유효하지 않은 토큰입니다.")
 
 
 @router.post("", response_model=dict)
