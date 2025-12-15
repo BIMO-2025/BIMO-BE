@@ -21,22 +21,23 @@ from app.feature.flights.flights_schemas import (
     AirlineSearchResponse,
     AirlineSearchResponseItem,
     SegmentDetailSchema,
+    AirportIATASearchRequest,
+    AirportIATASearchResponse,
+    AirportIATAResult,
 )
 
 
 class FlightsService:
     """항공편 검색 관련 비즈니스 로직을 처리하는 서비스 클래스"""
     
-    def __init__(self, amadeus_client=None, duffel_client=None, firebase_service: FirebaseService = None):
+    def __init__(self, duffel_client=None, firebase_service: FirebaseService = None):
         """
         FlightsService 초기화
         
         Args:
-            amadeus_client: Amadeus API 클라이언트 인스턴스 (deprecated)
             duffel_client: Duffel API 클라이언트 인스턴스
             firebase_service: Firebase 서비스 인스턴스
         """
-        self.amadeus_client = amadeus_client
         self.duffel_client = duffel_client
         self.firebase_service = firebase_service
         if firebase_service:
@@ -62,8 +63,6 @@ class FlightsService:
             return duration[2:]
         return duration
 
-    # 기존 Amadeus 기반 search_flights 메서드는 제거됨
-    # 새로운 search_airlines 메서드를 사용하세요
 
     async def _search_local_airports(self, keyword: str) -> List[LocationSchema]:
         """
@@ -117,7 +116,6 @@ class FlightsService:
         """
         키워드를 기반으로 공항을 검색합니다.
         로컬 Firestore 'airports' 컬렉션에서만 검색합니다.
-        (Amadeus API 호출 제거됨)
         """
         try:
             # 로컬 검색만 수행
@@ -415,5 +413,89 @@ class FlightsService:
             raise ExternalApiError(
                 provider="Duffel",
                 detail=f"항공편 검색 중 오류가 발생했습니다: {str(e)}",
+            ) from e
+
+    async def search_airport_iata_code(self, request: AirportIATASearchRequest) -> AirportIATASearchResponse:
+        """
+        Duffel API를 사용하여 위치 정보로 공항 IATA 코드를 검색합니다.
+        
+        Args:
+            request: 공항 IATA 코드 검색 요청 (location)
+            
+        Returns:
+            검색된 공항 IATA 코드 목록
+        """
+        if not self.duffel_client:
+            raise ExternalApiError(
+                provider="Duffel",
+                detail="Duffel 클라이언트가 초기화되지 않았습니다.",
+            )
+        
+        try:
+            # location을 그대로 쿼리로 사용
+            query = request.location.strip()
+            
+            if not query:
+                raise ExternalApiError(
+                    provider="Duffel",
+                    detail="위치 정보는 필수입니다.",
+                )
+            
+            # 1. Duffel API 호출
+            places = await self.duffel_client.search_places(query=query)
+            
+            if not places:
+                return AirportIATASearchResponse(count=0, results=[])
+            
+            # 2. 공항 타입만 필터링 및 IATA 코드 추출
+            airport_results = []
+            seen_iata_codes = set()
+            
+            for place in places:
+                try:
+                    # type이 "airport"인 것만 필터링
+                    place_type = place.get("type", "").lower()
+                    if place_type != "airport":
+                        continue
+                    
+                    # IATA 코드 추출
+                    iata_code = place.get("iata_code") or place.get("iata")
+                    if not iata_code:
+                        continue
+                    
+                    # 중복 제거
+                    if iata_code in seen_iata_codes:
+                        continue
+                    seen_iata_codes.add(iata_code)
+                    
+                    # 추가 정보 추출
+                    city = place.get("city", {}).get("name") if isinstance(place.get("city"), dict) else place.get("city")
+                    country = place.get("country", {}).get("name") if isinstance(place.get("country"), dict) else place.get("country")
+                    name = place.get("name")
+                    
+                    airport_results.append(
+                        AirportIATAResult(
+                            iata_code=iata_code,
+                            city=city,
+                            country=country,
+                            name=name,
+                        )
+                    )
+                    
+                except Exception as e:
+                    logger.warning(f"Place 파싱 실패: {str(e)}")
+                    continue
+            
+            return AirportIATASearchResponse(
+                count=len(airport_results),
+                results=airport_results,
+            )
+            
+        except ExternalApiError:
+            raise
+        except Exception as e:
+            raise ExternalApiError(
+                provider="Duffel",
+                detail=f"공항 IATA 코드 검색 중 오류가 발생했습니다: {str(e)}",
             ) from e
 

@@ -413,3 +413,68 @@ class AirlineSearchResponse(BaseModel):
             }
         }
     )
+
+
+# ===========================================================================
+# 공항 IATA 코드 검색 관련 스키마 (Duffel API용)
+# ===========================================================================
+
+
+class AirportIATASearchRequest(BaseModel):
+    """
+    공항 IATA 코드 검색 요청 스키마
+    """
+    location: str = Field(..., description="위치 정보 (도시명, 국가명 등, 예: 'Seoul' 또는 'Seoul South Korea')")
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "location": "Seoul South Korea"
+            }
+        }
+    )
+
+
+class AirportIATAResult(BaseModel):
+    """
+    공항 IATA 코드 검색 결과 항목
+    """
+    iata_code: str = Field(..., description="공항 IATA 코드 (예: ICN)")
+    city: Optional[str] = Field(None, description="도시명")
+    country: Optional[str] = Field(None, description="국가명")
+    name: Optional[str] = Field(None, description="공항명")
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "iata_code": "ICN",
+                "city": "Seoul",
+                "country": "South Korea",
+                "name": "Incheon International Airport"
+            }
+        }
+    )
+
+
+class AirportIATASearchResponse(BaseModel):
+    """
+    공항 IATA 코드 검색 응답 스키마
+    """
+    count: int = Field(..., description="검색된 공항 개수")
+    results: List[AirportIATAResult] = Field(..., description="검색된 공항 목록")
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "count": 1,
+                "results": [
+                    {
+                        "iata_code": "ICN",
+                        "city": "Seoul",
+                        "country": "South Korea",
+                        "name": "Incheon International Airport"
+                    }
+                ]
+            }
+        }
+    )

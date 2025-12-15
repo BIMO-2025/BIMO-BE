@@ -254,6 +254,115 @@ class DuffelClient:
                 detail=f"{user_message} (재시도 {max_retries}회 실패)",
             ) from last_error
 
+    async def search_places(
+        self,
+        query: str,
+        max_retries: int = 2,
+    ) -> list[dict]:
+        """
+        Duffel API를 사용하여 장소(공항, 도시 등)를 검색합니다. (재시도 로직 포함)
+
+        Args:
+            query: 검색 쿼리 (도시명, 국가명 등, 예: "Seoul South Korea")
+            max_retries: 최대 재시도 횟수 (기본값: 2)
+
+        Returns:
+            검색된 장소 정보 리스트
+
+        Raises:
+            ExternalApiError: Duffel API 호출 중 오류 발생 시
+        """
+        last_error = None
+        
+        for attempt in range(max_retries):
+            try:
+                # GET /places/suggestions 호출
+                response = await self.client.get(
+                    "/places/suggestions",
+                    params={"query": query},
+                )
+                response.raise_for_status()
+                
+                result = response.json()
+                
+                # 성공 시 로그
+                if attempt > 0:
+                    logger.info(f"Duffel API 재시도 성공 (시도: {attempt + 1}/{max_retries})")
+                
+                # 응답에서 data 추출
+                places = result.get("data", [])
+                return places if isinstance(places, list) else []
+
+            except httpx.HTTPStatusError as exc:
+                last_error = exc
+                error_info = self._extract_error_info(exc)
+                
+                # 로그 기록
+                logger.warning(
+                    f"Duffel API 장소 검색 오류 (시도 {attempt + 1}/{max_retries}): "
+                    f"Status={error_info['status_code']}, "
+                    f"Code={error_info['error_code']}, "
+                    f"Title={error_info['title']}"
+                )
+                
+                # 재시도 가능 여부 확인
+                if error_info["is_retryable"] and attempt < max_retries - 1:
+                    # Exponential backoff
+                    wait_time = (2 ** attempt) * 0.5  # 0.5s, 1s
+                    logger.info(f"Duffel API 재시도 대기 중... ({wait_time}초)")
+                    await asyncio.sleep(wait_time)
+                    continue
+                
+                # 재시도 불가능하거나 마지막 시도 실패
+                user_message = self._get_user_friendly_message(error_info)
+                raise ExternalApiError(
+                    provider="Duffel",
+                    detail=user_message,
+                ) from exc
+                
+            except httpx.RequestError as exc:
+                last_error = exc
+                error_info = self._extract_error_info(exc)
+                
+                logger.warning(
+                    f"Duffel API 요청 오류 (시도 {attempt + 1}/{max_retries}): {str(exc)}"
+                )
+                
+                # 네트워크 오류는 재시도 가능
+                if attempt < max_retries - 1:
+                    wait_time = (2 ** attempt) * 0.5
+                    logger.info(f"Duffel API 재시도 대기 중... ({wait_time}초)")
+                    await asyncio.sleep(wait_time)
+                    continue
+                
+                raise ExternalApiError(
+                    provider="Duffel",
+                    detail="장소 검색 서비스에 연결할 수 없습니다. 잠시 후 다시 시도해주세요.",
+                ) from exc
+                
+            except Exception as exc:
+                last_error = exc
+                logger.error(f"Duffel API 예상치 못한 오류: {str(exc)}")
+                
+                if attempt < max_retries - 1:
+                    wait_time = (2 ** attempt) * 0.5
+                    await asyncio.sleep(wait_time)
+                    continue
+                
+                raise ExternalApiError(
+                    provider="Duffel",
+                    detail=f"장소 검색 중 오류가 발생했습니다: {str(exc)}",
+                ) from exc
+        
+        # 모든 재시도 실패
+        if last_error:
+            error_info = self._extract_error_info(last_error)
+            user_message = self._get_user_friendly_message(error_info)
+            raise ExternalApiError(
+                provider="Duffel",
+                detail=f"{user_message} (재시도 {max_retries}회 실패)",
+            ) from last_error
+
     async def close(self):
         """HTTP 클라이언트 종료"""
         await self.client.aclose()

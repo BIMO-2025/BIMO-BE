@@ -34,12 +34,6 @@ def get_flights_service(
     )
 
 
-# 기존 Amadeus 기반 엔드포인트는 제거됨
-# @router.post("/search", response_model=flights_schemas.FlightSearchResponse)
-# async def search_flights(...):
-#     ...
-
-
 @router.post("/search/airlines", response_model=flights_schemas.AirlineSearchResponse)
 async def search_airlines_flights(
     request: flights_schemas.AirlineSearchRequest,
@@ -74,6 +68,22 @@ async def search_airlines(
     동일한 operating carrier를 가진 항공편만 반환됩니다.
     """
     return await service.search_airlines(request)
+
+
+@search_router.get("/airportIATACode", response_model=flights_schemas.AirportIATASearchResponse)
+async def search_airport_iata_code(
+    location: str,
+    service: FlightsService = Depends(get_flights_service)
+):
+    """
+    위치 정보로 공항 IATA 코드를 검색합니다.
+
+    - **location**: 위치 정보 (도시명, 국가명 등, 예: "Seoul" 또는 "Seoul South Korea")
+
+    Duffel API를 사용하여 공항 정보를 조회합니다.
+    """
+    request = flights_schemas.AirportIATASearchRequest(location=location)
+    return await service.search_airport_iata_code(request)
 
 @router.get("/locations", response_model=flights_schemas.LocationSearchResponse)
 async def search_locations(
