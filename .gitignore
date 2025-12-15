@@ -214,3 +214,6 @@ firebase_service_key.json
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Project artifacts (coverage, logs, temp files)
+artifacts/

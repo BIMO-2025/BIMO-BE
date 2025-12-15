@@ -1,9 +1,0 @@
-{
-    "origin": "DXB",
-    "destination": "ICN",
-    "departure_time": "2025-11-25T09:00:00",
-    "arrival_time": "2025-11-25T23:15:00",
-    "seat_class": "ECONOMY",
-    "flight_goal": "SLEEP_FOCUS",
-    "total_duration": "14h 15m"
-}
