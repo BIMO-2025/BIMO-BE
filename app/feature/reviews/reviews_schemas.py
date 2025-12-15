@@ -84,7 +84,7 @@ class ReviewSchema(BaseModel):
     route: str
     flightNumber: Optional[str] = None  # 항공편 번호 (예: "KE901")
     seatClass: Optional[str] = None  # 좌석 등급 (예: "이코노미", "비즈니스", "퍼스트", "프리미엄 이코노미")
-    imageUrl: Optional[str] = None
+    imageUrls: List[str] = Field(default_factory=list, description="리뷰 이미지 URL 리스트 (0-3개)")
     ratings: RatingsSchema
     overallRating: float = Field(..., ge=1, le=5)
     text: str
