@@ -91,73 +91,42 @@ class MyFlightSchema(BaseModel):
     model_config = ConfigDict(
         from_attributes=True,
         json_schema_extra={
-            "examples": [
-                {
-                    "description": "경유 항공편 (segments 2개 이상)",
-                    "value": {
-                        "segments": [
-                            {
-                                "operating_carrier": "KE",
-                                "flight_number": "KE901",
-                                "duration": "3H30M",
-                                "departure": {
-                                    "iata_code": "ICN",
-                                    "at": "2025-12-25T10:00:00Z"
-                                },
-                                "arrival": {
-                                    "iata_code": "NRT",
-                                    "at": "2025-12-25T13:30:00Z"
-                                }
-                            },
-                            {
-                                "operating_carrier": "KE",
-                                "flight_number": "KE001",
-                                "duration": "11H00M",
-                                "departure": {
-                                    "iata_code": "NRT",
-                                    "at": "2025-12-25T15:00:00Z"
-                                },
-                                "arrival": {
-                                    "iata_code": "JFK",
-                                    "at": "2025-12-25T20:30:00Z"
-                                }
-                            }
-                        ],
-                        "departureTime": "2025-12-25T10:00:00Z",
-                        "arrivalTime": "2025-12-25T20:30:00Z",
-                        "status": "scheduled",
-                        "departureAirport": "ICN",
-                        "arrivalAirport": "JFK",
-                        "hasStopover": True
+            "example": {
+                "segments": [
+                    {
+                        "operating_carrier": "KE",
+                        "flight_number": "KE901",
+                        "duration": "3H30M",
+                        "departure": {
+                            "iata_code": "ICN",
+                            "at": "2025-12-25T10:00:00Z"
+                        },
+                        "arrival": {
+                            "iata_code": "NRT",
+                            "at": "2025-12-25T13:30:00Z"
+                        }
+                    },
+                    {
+                        "operating_carrier": "KE",
+                        "flight_number": "KE001",
+                        "duration": "11H00M",
+                        "departure": {
+                            "iata_code": "NRT",
+                            "at": "2025-12-25T15:00:00Z"
+                        },
+                        "arrival": {
+                            "iata_code": "JFK",
+                            "at": "2025-12-25T20:30:00Z"
+                        }
                     }
-                },
-                {
-                    "description": "직항 항공편 (segments 1개)",
-                    "value": {
-                        "segments": [
-                            {
-                                "operating_carrier": "KE",
-                                "flight_number": "KE901",
-                                "duration": "14H30M",
-                                "departure": {
-                                    "iata_code": "ICN",
-                                    "at": "2025-12-25T13:45:00Z"
-                                },
-                                "arrival": {
-                                    "iata_code": "JFK",
-                                    "at": "2025-12-25T18:20:00Z"
-                                }
-                            }
-                        ],
-                "departureTime": "2025-12-25T13:45:00Z",
-                "arrivalTime": "2025-12-25T18:20:00Z",
+                ],
+                "departureTime": "2025-12-25T10:00:00Z",
+                "arrivalTime": "2025-12-25T20:30:00Z",
                 "status": "scheduled",
                 "departureAirport": "ICN",
                 "arrivalAirport": "JFK",
-                        "hasStopover": False
-                    }
+                "hasStopover": True
             }
-            ]
         }
     )
 
