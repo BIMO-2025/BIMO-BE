@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, ConfigDict
+from pydantic import BaseModel, Field, ConfigDict, model_validator
 from typing import Dict, Literal, Optional, List, Any
 from datetime import datetime, timezone
 
@@ -6,28 +6,158 @@ class MyFlightSchema(BaseModel):
     """
     사용자의 비행 기록을 나타냅니다.
     경로: users/{userId}/myFlights/{myFlightId}
+    
+    직항 및 경유 항공편 모두 segments 필드로 처리합니다.
+    segments[0]의 operating_carrier와 flight_number를 기본 항공편 정보로 사용합니다.
     """
-    flightNumber: str
-    airlineCode: str
-    departureTime: datetime
-    arrivalTime: datetime
+    segments: List["SegmentDetailSchema"] = Field(..., min_length=1, description="항공편 구간 정보 리스트 (직항은 1개, 경유는 2개 이상)")
+    departureTime: datetime = Field(..., description="전체 여정의 첫 출발 시간 (segments[0].departure.at과 일치해야 함)")
+    arrivalTime: datetime = Field(..., description="전체 여정의 마지막 도착 시간 (segments[-1].arrival.at과 일치해야 함)")
     status: Literal["scheduled", "completed"]
     reviewId: Optional[str] = None
-    departureAirport: Optional[str] = Field(None, description="출발 공항 코드 (예: ICN)")
-    arrivalAirport: Optional[str] = Field(None, description="도착 공항 코드 (예: JFK)")
+    departureAirport: Optional[str] = Field(None, description="출발 공항 코드 (예: ICN, segments[0].departure.iata_code와 일치해야 함)")
+    arrivalAirport: Optional[str] = Field(None, description="도착 공항 코드 (예: JFK, segments[-1].arrival.iata_code와 일치해야 함)")
+    hasStopover: Optional[bool] = Field(None, description="경유 여부 (segments가 2개 이상이면 True, 1개면 False, 자동 계산됨)")
+
+    @model_validator(mode="after")
+    def validate_segments(self):
+        """segments 데이터 일관성 검증"""
+        if len(self.segments) == 0:
+            raise ValueError("segments는 최소 1개 이상이어야 합니다.")
+        
+        # 첫 번째 segment와 departureAirport/departureTime 일치 확인
+        first_segment = self.segments[0]
+        first_departure = first_segment.departure
+        if isinstance(first_departure, dict):
+            first_dep_iata = first_departure.get("iata_code") or first_departure.get("iataCode")
+            first_dep_time = first_departure.get("at")
+            
+            if self.departureAirport and first_dep_iata and self.departureAirport != first_dep_iata:
+                raise ValueError(f"첫 번째 segment의 출발 공항({first_dep_iata})이 departureAirport({self.departureAirport})와 일치하지 않습니다.")
+            
+            if first_dep_time:
+                try:
+                    if isinstance(first_dep_time, str):
+                        first_dep_datetime = datetime.fromisoformat(first_dep_time.replace("Z", "+00:00"))
+                    else:
+                        first_dep_datetime = first_dep_time
+                    if abs((first_dep_datetime - self.departureTime).total_seconds()) > 3600:  # 1시간 허용 오차
+                        raise ValueError(f"첫 번째 segment의 출발 시간이 departureTime과 일치하지 않습니다.")
+                except (ValueError, AttributeError):
+                    pass  # 시간 형식이 다르면 검증 건너뛰기
+        
+        # 마지막 segment와 arrivalAirport/arrivalTime 일치 확인
+        last_segment = self.segments[-1]
+        last_arrival = last_segment.arrival
+        if isinstance(last_arrival, dict):
+            last_arr_iata = last_arrival.get("iata_code") or last_arrival.get("iataCode")
+            last_arr_time = last_arrival.get("at")
+            
+            if self.arrivalAirport and last_arr_iata and self.arrivalAirport != last_arr_iata:
+                raise ValueError(f"마지막 segment의 도착 공항({last_arr_iata})이 arrivalAirport({self.arrivalAirport})와 일치하지 않습니다.")
+            
+            if last_arr_time:
+                try:
+                    if isinstance(last_arr_time, str):
+                        last_arr_datetime = datetime.fromisoformat(last_arr_time.replace("Z", "+00:00"))
+                    else:
+                        last_arr_datetime = last_arr_time
+                    if abs((last_arr_datetime - self.arrivalTime).total_seconds()) > 3600:  # 1시간 허용 오차
+                        raise ValueError(f"마지막 segment의 도착 시간이 arrivalTime과 일치하지 않습니다.")
+                except (ValueError, AttributeError):
+                    pass  # 시간 형식이 다르면 검증 건너뛰기
+        
+        # segments 간 연속성 검증
+        for i in range(len(self.segments) - 1):
+            current_segment = self.segments[i]
+            next_segment = self.segments[i + 1]
+            
+            current_arrival = current_segment.arrival
+            next_departure = next_segment.departure
+            
+            if isinstance(current_arrival, dict) and isinstance(next_departure, dict):
+                current_arr_iata = current_arrival.get("iata_code") or current_arrival.get("iataCode")
+                next_dep_iata = next_departure.get("iata_code") or next_departure.get("iataCode")
+                
+                if current_arr_iata and next_dep_iata and current_arr_iata != next_dep_iata:
+                    raise ValueError(f"segment {i+1}의 도착 공항({current_arr_iata})과 segment {i+2}의 출발 공항({next_dep_iata})가 일치하지 않습니다.")
+        
+        # hasStopover 자동 설정
+        if self.hasStopover is None:
+            self.hasStopover = len(self.segments) > 1
+        
+        return self
 
     model_config = ConfigDict(
         from_attributes=True,
         json_schema_extra={
-            "example": {
-                "flightNumber": "KE901",
-                "airlineCode": "KE",
-                "departureTime": "2025-12-25T13:45:00Z",
-                "arrivalTime": "2025-12-25T18:20:00Z",
-                "status": "scheduled",
-                "departureAirport": "ICN",
-                "arrivalAirport": "JFK",
-            }
+            "examples": [
+                {
+                    "description": "경유 항공편 (segments 2개 이상)",
+                    "value": {
+                        "segments": [
+                            {
+                                "operating_carrier": "KE",
+                                "flight_number": "KE901",
+                                "duration": "3H30M",
+                                "departure": {
+                                    "iata_code": "ICN",
+                                    "at": "2025-12-25T10:00:00Z"
+                                },
+                                "arrival": {
+                                    "iata_code": "NRT",
+                                    "at": "2025-12-25T13:30:00Z"
+                                }
+                            },
+                            {
+                                "operating_carrier": "KE",
+                                "flight_number": "KE001",
+                                "duration": "11H00M",
+                                "departure": {
+                                    "iata_code": "NRT",
+                                    "at": "2025-12-25T15:00:00Z"
+                                },
+                                "arrival": {
+                                    "iata_code": "JFK",
+                                    "at": "2025-12-25T20:30:00Z"
+                                }
+                            }
+                        ],
+                        "departureTime": "2025-12-25T10:00:00Z",
+                        "arrivalTime": "2025-12-25T20:30:00Z",
+                        "status": "scheduled",
+                        "departureAirport": "ICN",
+                        "arrivalAirport": "JFK",
+                        "hasStopover": True
+                    }
+                },
+                {
+                    "description": "직항 항공편 (segments 1개)",
+                    "value": {
+                        "segments": [
+                            {
+                                "operating_carrier": "KE",
+                                "flight_number": "KE901",
+                                "duration": "14H30M",
+                                "departure": {
+                                    "iata_code": "ICN",
+                                    "at": "2025-12-25T13:45:00Z"
+                                },
+                                "arrival": {
+                                    "iata_code": "JFK",
+                                    "at": "2025-12-25T18:20:00Z"
+                                }
+                            }
+                        ],
+                        "departureTime": "2025-12-25T13:45:00Z",
+                        "arrivalTime": "2025-12-25T18:20:00Z",
+                        "status": "scheduled",
+                        "departureAirport": "ICN",
+                        "arrivalAirport": "JFK",
+                        "hasStopover": False
+                    }
+                }
+            ]
         }
     )
 
@@ -478,3 +608,7 @@ class AirportIATASearchResponse(BaseModel):
             }
         }
     )
+
+
+# Forward reference 해결
+MyFlightSchema.model_rebuild()

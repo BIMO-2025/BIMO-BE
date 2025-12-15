@@ -11,33 +11,113 @@ BIMO-BE 프로젝트의 Firestore 데이터베이스 스키마 설계 문서입�
 **경로**: `users/{userId}/myFlights/{myFlightId}`
 
 **필드**:
-- `flightNumber`: (String) 항공편 번호 (예: "KE901")
-- `airlineCode`: (String) 항공사 코드 (예: "KE")
-- `departureTime`: (Timestamp) 출발 시간
-- `arrivalTime`: (Timestamp) 도착 시간
-- `status`: (String) 비행 상태
+- `segments`: (Array, Required) 항공편 구간 정보 리스트 (필수, 최소 1개)
+  - 직항: 1개의 segment
+  - 경유: 2개 이상의 segment
+  - 각 segment 객체:
+    - `operating_carrier`: (String) 운항 항공사 코드 (예: "KE")
+    - `flight_number`: (String) 항공편명 (예: "KE901")
+    - `duration`: (String) 구간 비행 시간 (예: "14H30M" 또는 "PT14H30M")
+    - `departure`: (Object) 출발 정보
+      - `iata_code`: (String) 출발 공항 코드 (예: "ICN")
+      - `at`: (String) 출발 시간 (ISO 8601 형식, 예: "2025-12-25T10:00:00Z")
+    - `arrival`: (Object) 도착 정보
+      - `iata_code`: (String) 도착 공항 코드 (예: "JFK")
+      - `at`: (String) 도착 시간 (ISO 8601 형식)
+  - `segments[0].operating_carrier`와 `segments[0].flight_number`가 기본 항공편 정보로 사용됨
+- `departureTime`: (Timestamp, Required) 출발 시간 - 전체 여정의 첫 출발 시간 (segments[0].departure.at과 일치)
+- `arrivalTime`: (Timestamp, Required) 도착 시간 - 전체 여정의 마지막 도착 시간 (segments[-1].arrival.at과 일치)
+- `status`: (String, Required) 비행 상태
   - `"scheduled"`: 예정된 비행
   - `"completed"`: 완료된 비행
+- `departureAirport`: (String, Optional) 출발 공항 코드 (예: "ICN") - 전체 여정의 출발지 (segments[0].departure.iata_code와 일치 권장)
+- `arrivalAirport`: (String, Optional) 도착 공항 코드 (예: "JFK") - 전체 여정의 최종 도착지 (segments[-1].arrival.iata_code와 일치 권장)
 - `reviewId`: (String, Optional) 리뷰 ID (Foreign Key)
   - 이 비행에 대해 작성한 리뷰가 있다면 `reviews/{reviewId}` 참조
+- `hasStopover`: (Boolean, Optional) 경유 여부
+  - `segments`가 2개 이상이면 `true`, 1개면 `false`
+  - 자동 계산됨
 
 **인덱스**:
 - `userId` (컬렉션 경로에서 자동)
 - `status`
 - `departureTime` (내림차순)
-- `airlineCode`
 
-**예시**:
+**예시 1: 직항 항공편 (segments 1개)**
 ```json
 {
-  "flightNumber": "KE901",
-  "airlineCode": "KE",
+  "segments": [
+    {
+      "operating_carrier": "KE",
+      "flight_number": "KE901",
+      "duration": "14H30M",
+      "departure": {
+        "iata_code": "ICN",
+        "at": "2025-12-25T13:45:00Z"
+      },
+      "arrival": {
+        "iata_code": "JFK",
+        "at": "2025-12-25T18:20:00Z"
+      }
+    }
+  ],
   "departureTime": "2025-12-25T13:45:00Z",
   "arrivalTime": "2025-12-25T18:20:00Z",
   "status": "completed",
+  "departureAirport": "ICN",
+  "arrivalAirport": "JFK",
+  "hasStopover": false,
   "reviewId": "review_abc123"
 }
 ```
+
+**예시 2: 경유 항공편 (segments 2개 이상)**
+```json
+{
+  "segments": [
+    {
+      "operating_carrier": "KE",
+      "flight_number": "KE901",
+      "duration": "3H30M",
+      "departure": {
+        "iata_code": "ICN",
+        "at": "2025-12-25T10:00:00Z"
+      },
+      "arrival": {
+        "iata_code": "NRT",
+        "at": "2025-12-25T13:30:00Z"
+      }
+    },
+    {
+      "operating_carrier": "KE",
+      "flight_number": "KE001",
+      "duration": "11H00M",
+      "departure": {
+        "iata_code": "NRT",
+        "at": "2025-12-25T15:00:00Z"
+      },
+      "arrival": {
+        "iata_code": "JFK",
+        "at": "2025-12-25T20:30:00Z"
+      }
+    }
+  ],
+  "departureTime": "2025-12-25T10:00:00Z",
+  "arrivalTime": "2025-12-25T20:30:00Z",
+  "status": "scheduled",
+  "departureAirport": "ICN",
+  "arrivalAirport": "JFK",
+  "hasStopover": true
+}
+```
+
+**데이터 일관성 규칙**:
+- `segments`는 필수이며 최소 1개 이상이어야 함
+- 첫 번째 segment의 `departure.iata_code`는 `departureAirport`와 일치해야 함 (제공된 경우)
+- 첫 번째 segment의 `departure.at`은 `departureTime`과 일치해야 함
+- 마지막 segment의 `arrival.iata_code`는 `arrivalAirport`와 일치해야 함 (제공된 경우)
+- 마지막 segment의 `arrival.at`은 `arrivalTime`과 일치해야 함
+- 각 segment의 도착 공항은 다음 segment의 출발 공항과 일치해야 함 (연속성)
 
 ---
 

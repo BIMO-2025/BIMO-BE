@@ -3,7 +3,7 @@
 """
 
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Body
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 from app.feature.flights.flights_schemas import MyFlightSchema
@@ -79,12 +79,18 @@ async def create_my_flight(
     """
     사용자의 비행 기록을 생성합니다.
     
-    - **flightNumber**: 항공편 번호 (예: "KE901")
-    - **airlineCode**: 항공사 코드 (예: "KE")
-    - **departureTime**: 출발 시간 (ISO 8601 형식)
-    - **arrivalTime**: 도착 시간 (ISO 8601 형식)
-    - **status**: 비행 상태 ("scheduled" 또는 "completed")
+    - **segments**: 항공편 구간 정보 리스트 (필수, 최소 1개)
+      - 직항: 1개의 segment
+      - 경유: 2개 이상의 segment
+      - 각 segment는 operating_carrier, flight_number, duration, departure, arrival 정보 포함
+      - segments[0].operating_carrier와 segments[0].flight_number가 기본 항공편 정보로 사용됨
+    - **departureTime**: 출발 시간 (ISO 8601 형식, 필수) - 전체 여정의 첫 출발 시간 (segments[0].departure.at과 일치)
+    - **arrivalTime**: 도착 시간 (ISO 8601 형식, 필수) - 전체 여정의 마지막 도착 시간 (segments[-1].arrival.at과 일치)
+    - **status**: 비행 상태 (필수, "scheduled" 또는 "completed")
+    - **departureAirport**: 출발 공항 코드 (선택적, 예: "ICN", segments[0].departure.iata_code와 일치 권장)
+    - **arrivalAirport**: 도착 공항 코드 (선택적, 예: "JFK", segments[-1].arrival.iata_code와 일치 권장)
     - **reviewId**: 리뷰 ID (선택적)
+    - **hasStopover**: 경유 여부 (선택적, segments가 2개 이상이면 자동으로 True)
     """
     flight_id = await service.create_flight(user_id, flight_data)
     return {"id": flight_id, "message": "비행 기록이 생성되었습니다."}
