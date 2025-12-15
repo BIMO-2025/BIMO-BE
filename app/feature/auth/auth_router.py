@@ -34,6 +34,7 @@ async def _handle_social_login(
     
     return auth_schemas.TokenResponse(
         access_token=result["access_token"],
+        refresh_token=result["refresh_token"],
         token_type=result["token_type"],
         user=user_info
     )
@@ -114,6 +115,28 @@ async def login_with_kakao(request: auth_schemas.SocialLoginRequest):
     
     return auth_schemas.TokenResponse(
         access_token=result["access_token"],
+        refresh_token=result["refresh_token"],
         token_type=result["token_type"],
         user=user_info
     )
+
+
+@router.post("/refresh", response_model=auth_schemas.AccessTokenResponse)
+async def refresh_token(request: auth_schemas.RefreshTokenRequest):
+    """
+    Access Token 갱신 엔드포인트
+    
+    Refresh Token을 검증하여 새로운 Access Token을 발급합니다.
+    
+    - **refresh_token**: 로그인 시 발급받은 Refresh Token
+    
+    Returns:
+        - **access_token**: 새로운 JWT Access Token (30분 유효)
+        - **token_type**: "bearer"
+        
+    Note:
+        - Refresh Token은 기본적으로 7일간 유효합니다.
+        - Access Token이 만료되면 이 엔드포인트를 호출하여 새 토큰을 받으세요.
+        - Refresh Token이 만료된 경우 재로그인이 필요합니다.
+    """
+    return await auth_service.refresh_access_token(request.refresh_token)

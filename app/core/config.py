@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     API_SECRET_KEY: str
     API_TOKEN_ALGORITHM: str = "HS256"
     API_TOKEN_EXPIRE_MINUTES: int = 30
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
     # LLM(Gemini) 설정
     GEMINI_API_KEY: Optional[str] = None

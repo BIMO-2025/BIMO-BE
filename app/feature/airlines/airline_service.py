@@ -85,7 +85,7 @@ class AirlineService:
                         country=data.get("country", ""),
                         alliance=data.get("alliance"),
                         type=data.get("type", "FSC"),
-                        rating=data.get("averageRatings", {}).get("overall", 0.0),
+                        rating=data.get("averageRatings", {}).get("overallRating", 0.0),
                         review_count=data.get("totalReviews", 0),
                         logo_url=data.get("logoUrl"),
                     )
@@ -118,7 +118,7 @@ class AirlineService:
             # 1. 데이터 수집 및 평균 계산 준비
             for doc in docs:
                 data = doc.to_dict()
-                rating = data.get("averageRatings", {}).get("overall", 0.0)
+                rating = data.get("averageRatings", {}).get("overallRating", 0.0)
                 review_count = data.get("totalReviews", 0)
                 
                 airline = Airline(

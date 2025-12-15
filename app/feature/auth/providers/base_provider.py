@@ -7,7 +7,7 @@ from abc import ABC, abstractmethod
 from datetime import datetime, timezone
 from fastapi.concurrency import run_in_threadpool
 
-from app.core.security import create_access_token
+from app.core.security import create_access_token, create_refresh_token
 from app.shared.schemas import UserBase, UserInDB
 from app.core.exceptions.exceptions import (
     InvalidTokenPayloadError,
@@ -25,19 +25,23 @@ class BaseAuthProvider(ABC):
     """모든 인증 프로바이더의 기본 클래스"""
 
     @staticmethod
-    def generate_api_token(uid: str) -> str:
+    def generate_api_token(uid: str) -> dict:
         """
-        [동기 함수] 우리 서비스 전용 API Access Token (JWT)을 생성합니다.
+        [동기 함수] 우리 서비스 전용 API Access Token과 Refresh Token (JWT)을 생성합니다.
         
         Args:
             uid: 사용자 고유 ID
             
         Returns:
-            JWT 액세스 토큰 문자열
+            {"access_token": str, "refresh_token": str}
         """
         data = {"sub": uid}
         access_token = create_access_token(data=data)
-        return access_token
+        refresh_token = create_refresh_token(data=data)
+        return {
+            "access_token": access_token,
+            "refresh_token": refresh_token
+        }
 
     @staticmethod
     def _normalize_datetime_fields(user_data: dict) -> dict:
