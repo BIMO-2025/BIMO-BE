@@ -25,7 +25,7 @@ API_TOKEN_EXPIRE_MINUTES=30
 
 # Gemini API 설정
 GEMINI_API_KEY=your-gemini-api-key-here
-GEMINI_MODEL_NAME=gemini-1.5-flash
+GEMINI_MODEL_NAME=gemini-2.5-flash
 
 # Google OAuth 설정 (iOS)
 GOOGLE_IOS_CLIENT_ID=your-ios-client-id-here
@@ -59,22 +59,27 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000
 ## 📚 API 엔드포인트
 
 ### 인증 (Authentication)
+
 - `POST /auth/google/login` - Google 로그인
 - `POST /auth/apple/login` - Apple 로그인
 - `POST /auth/kakao/login` - Kakao 로그인
 
 ### 리뷰 (Reviews)
+
 - `GET /reviews/airline/{airline_code}` - 항공사 리뷰 목록
 - `GET /reviews/{review_id}` - 특정 리뷰 조회
 - `POST /reviews/summarize` - LLM으로 리뷰 요약
 
 ### 시차적응 (Wellness)
+
 - `POST /wellness/jetlag-plan` - 시차적응 계획 생성
 
 ### LLM
+
 - `POST /llm/chat` - Gemini 채팅
 
 ### 알림 (Notifications)
+
 - `POST /notifications/send` - 사용자에게 푸시 알림 전송
 - `POST /notifications/token/update` - FCM 토큰 업데이트
 - `POST /notifications/token/remove` - FCM 토큰 제거
@@ -82,6 +87,7 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000
 ## 🛠️ 개발 환경 설정
 
 ### Python 버전
+
 - Python 3.10 이상 권장
 
 ### 가상 환경 사용 (권장)

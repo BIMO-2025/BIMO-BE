@@ -20,7 +20,7 @@ os.environ.setdefault("API_SECRET_KEY", "test-secret-key-for-testing-only")
 os.environ.setdefault("API_TOKEN_ALGORITHM", "HS256")
 os.environ.setdefault("API_TOKEN_EXPIRE_MINUTES", "30")
 os.environ.setdefault("GEMINI_API_KEY", "test-gemini-key-for-testing")
-os.environ.setdefault("GEMINI_MODEL_NAME", "gemini-1.5-flash")
+os.environ.setdefault("GEMINI_MODEL_NAME", "gemini-2.5-flash")
 # FIREBASE_SERVICE_ACCOUNT_KEY는 .env에서 로드되거나, 없으면 기본값 사용
 os.environ.setdefault("FIREBASE_SERVICE_ACCOUNT_KEY", "./firebase_service_key.json")
 

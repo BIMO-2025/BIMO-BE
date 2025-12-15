@@ -25,7 +25,7 @@ class Settings(BaseSettings):
 
     # LLM(Gemini) 설정 - Google Generative AI
     GEMINI_API_KEY: Optional[str] = None
-    GEMINI_MODEL_NAME: str = "gemini-1.5-flash"
+    GEMINI_MODEL_NAME: str = "gemini-2.5-flash"
 
 
     # Duffel API 설정
