@@ -11,7 +11,7 @@ from app.feature.auth.providers import (
 )
 from app.core.security import decode_refresh_token, create_access_token
 from app.core.firebase import db
-from app.core.exceptions.exceptions import InvalidTokenError, UserNotFoundError, DatabaseError, CustomException
+from app.core.exceptions.exceptions import InvalidTokenError, UserProfileNotFoundError, DatabaseError, CustomException
 
 user_collection = db.collection("users")
 
@@ -147,7 +147,7 @@ async def refresh_access_token(refresh_token: str) -> dict:
         user_doc = await run_in_threadpool(user_ref.get)
         
         if not user_doc.exists:
-            raise UserNotFoundError(message="존재하지 않는 사용자입니다.")
+            raise UserProfileNotFoundError()
             
         # 필요한 경우 사용자 상태(활성/정지 등)를 여기서 체크할 수 있습니다.
         
