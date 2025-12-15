@@ -42,7 +42,7 @@ class AirlineSchema(BaseModel):
     totalReviews: int = 0
     totalRatingSums: Dict[str, int] = Field(default_factory=dict)
     averageRatings: Dict[str, float] = Field(default_factory=dict)
-    ratingBreakdown: Dict[str, Dict[str, int]] = Field(default_factory=dict)
+    ratingBreakdown: Dict[str, Any] = Field(default_factory=dict)  # 유연하게 처리
     overallRating: float = 0.0
     # 확장 필드 (상세 화면용)
     alliance: Optional[str] = Field(None, description="항공 동맹 (예: SkyTeam)")
@@ -53,6 +53,8 @@ class AirlineSchema(BaseModel):
     operatingClasses: List[str] = Field(default_factory=list, description="운항 클래스 목록")
     images: List[str] = Field(default_factory=list, description="대표/갤러리 이미지 URL 리스트")
     description: Optional[str] = Field(None, description="항공사 설명")
+    # BIMO 요약 (리뷰 기반 AI 요약)
+    bimoSummary: Optional[Dict[str, Any]] = Field(None, description="BIMO AI 요약 (Good/Bad 포인트)")
 
     model_config = ConfigDict(
         from_attributes=True,

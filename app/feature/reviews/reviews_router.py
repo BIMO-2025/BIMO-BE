@@ -3,7 +3,7 @@
 """
 from __future__ import annotations
 
-from fastapi import APIRouter, Query, HTTPException, Depends
+from fastapi import APIRouter, Query, HTTPException, Depends, BackgroundTasks
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from typing import Optional, Annotated
 
@@ -34,19 +34,7 @@ def get_reviews_service(
     )
 
 
-@router.get("/airline/{airline_code}", response_model=list[reviews_schemas.ReviewSchema])
-async def get_airline_reviews(
-    airline_code: str,
-    limit: int = Query(10, ge=1, le=100, description="조회할 리뷰 개수"),
-    service: ReviewsService = Depends(get_reviews_service)
-):
-    """
-    항공사 코드로 리뷰 목록을 조회합니다.
-    
-    - **airline_code**: 항공사 코드 (예: KE, OZ)
-    - **limit**: 조회할 리뷰 개수 (기본값: 10, 최대: 100)
-    """
-    return await service.get_reviews_by_airline(airline_code, limit=limit)
+
 
 
 @router.get("/{review_id}", response_model=reviews_schemas.ReviewSchema)
@@ -62,24 +50,7 @@ async def get_review(
     return await service.get_review_by_id(review_id)
 
 
-@router.post("/summarize", response_model=reviews_schemas.ReviewSummaryResponse)
-async def summarize_airline_reviews(
-    request: reviews_schemas.ReviewSummaryRequest,
-    service: ReviewsService = Depends(get_reviews_service)
-):
-    """
-    LLM을 사용하여 항공사 리뷰를 요약합니다.
-    
-    - **airline_code**: 항공사 코드 (필수)
-    - **airline_name**: 항공사 이름 (선택사항)
-    - **limit**: 요약에 사용할 리뷰 개수 (기본값: 50, 최대: 100)
-    
-    LLM이 리뷰들을 분석하여 전체적인 평가, 장점, 단점, 추천 대상을 요약합니다.
-    """
-    return await service.get_airline_reviews_summary(
-        airline_code=request.airline_code,
-        airline_name=request.airline_name
-    )
+
 
 
 @router.get("/detailed/{airline_code}", response_model=reviews_schemas.DetailedReviewsResponse)
@@ -146,6 +117,7 @@ async def get_detailed_reviews(
 @router.post("", response_model=reviews_schemas.ReviewSchema, status_code=201)
 async def create_review(
     review: reviews_schemas.ReviewSchema,
+    background_tasks: BackgroundTasks,
     credentials: HTTPAuthorizationCredentials = Depends(security),
     service: ReviewsService = Depends(get_reviews_service)
 ):
@@ -153,7 +125,7 @@ async def create_review(
     새로운 리뷰를 생성합니다.
     
     - **인증 필요**: Bearer Token
-    - 리뷰 작성 시 항공사 통계가 자동으로 업데이트됩니다
+    - 리뷰 작성 시 항공사 통계가 자동으로 업데이트됩니다 (백그라운드에서 처리)
     
     Request Body:
     - userId: 사용자 ID
@@ -183,6 +155,18 @@ async def create_review(
         
         # 리뷰 생성
         created_review = await service.create_review(review, user_id)
+        
+        # 백그라운드에서 통계 업데이트
+        background_tasks.add_task(
+            service._update_airline_statistics,
+            review.airlineCode
+        )
+        # 백그라운드에서 BIMO 요약 업데이트
+        background_tasks.add_task(
+            service._update_bimo_summary,
+            review.airlineCode
+        )
+        
         return created_review
     except HTTPException:
         raise
@@ -194,6 +178,7 @@ async def create_review(
 async def update_review(
     review_id: str,
     review: reviews_schemas.ReviewSchema,
+    background_tasks: BackgroundTasks,
     credentials: HTTPAuthorizationCredentials = Depends(security),
     service: ReviewsService = Depends(get_reviews_service)
 ):
@@ -201,7 +186,7 @@ async def update_review(
     기존 리뷰를 수정합니다.
     
     - **인증 필요**: Bearer Token (본인의 리뷰만 수정 가능)
-    - 리뷰 수정 시 항공사 통계가 자동으로 업데이트됩니다
+    - 리뷰 수정 시 항공사 통계가 자동으로 업데이트됩니다 (백그라운드에서 처리)
     - 항공사 코드 변경 시 이전 항공사와 새 항공사 모두 통계 업데이트
     
     Path Parameters:
@@ -215,8 +200,35 @@ async def update_review(
         decoded_token = verify_firebase_token(token)
         user_id = decoded_token.get("uid")
         
+        # 기존 리뷰 조회 (항공사 코드 변경 확인용)
+        old_review = await service.get_review_by_id(review_id)
+        old_airline_code = old_review.airlineCode
+        new_airline_code = review.airlineCode
+        
         # 리뷰 수정
         updated_review = await service.update_review(review_id, review, user_id)
+        
+        # 백그라운드에서 통계 업데이트
+        background_tasks.add_task(
+            service._update_airline_statistics,
+            new_airline_code
+        )
+        # 백그라운드에서 BIMO 요약 업데이트
+        background_tasks.add_task(
+            service._update_bimo_summary,
+            new_airline_code
+        )
+        if old_airline_code != new_airline_code:
+            # 항공사 변경 시 이전 항공사도 업데이트
+            background_tasks.add_task(
+                service._update_airline_statistics,
+                old_airline_code
+            )
+            background_tasks.add_task(
+                service._update_bimo_summary,
+                old_airline_code
+            )
+        
         return updated_review
     except HTTPException:
         raise
@@ -227,14 +239,15 @@ async def update_review(
 @router.delete("/{review_id}")
 async def delete_review(
     review_id: str,
+    background_tasks: BackgroundTasks,
     credentials: HTTPAuthorizationCredentials = Depends(security),
     service: ReviewsService = Depends(get_reviews_service)
 ):
     """
     리뷰를 삭제합니다.
     
-    - **인증 필요**: Bearer Token (본인의 리뷼만 삭제 가능)
-    - 리뷰 삭제 시 항공사 통계가 자동으로 업데이트됩니다
+    - **인증 필요**: Bearer Token (본인의 리뷸만 삭제 가능)
+    - 리뷰 삭제 시 항공사 통계가 자동으로 업데이트됩니다 (백그라운드에서 처리)
     
     Path Parameters:
     - review_id: 리뷰 ID
@@ -249,8 +262,24 @@ async def delete_review(
         decoded_token = verify_firebase_token(token)
         user_id = decoded_token.get("uid")
         
+        # 삭제 전 리뷰 정보 조회 (항공사 코드 확인용)
+        old_review = await service.get_review_by_id(review_id)
+        airline_code = old_review.airlineCode
+        
         # 리뷰 삭제
         result = await service.delete_review(review_id, user_id)
+        
+        # 백그라운드에서 통계 업데이트
+        background_tasks.add_task(
+            service._update_airline_statistics,
+            airline_code
+        )
+        # 백그라운드에서 BIMO 요약 업데이트
+        background_tasks.add_task(
+            service._update_bimo_summary,
+            airline_code
+        )
+        
         return result
     except HTTPException:
         raise

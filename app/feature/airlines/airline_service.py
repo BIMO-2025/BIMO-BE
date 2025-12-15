@@ -402,6 +402,47 @@ class AirlineService:
                 raise e
             raise DatabaseError(message=f"항공사 정렬 조회 중 오류 발생: {e}")
     
+    async def get_airline_with_bimo(self, airline_code: str) -> Optional[AirlineSchema]:
+        """
+        항공사 정보와 BIMO 요약을 함께 조회합니다.
+        
+        Args:
+            airline_code: 항공사 코드
+            
+        Returns:
+            AirlineSchema (bimoSummary 포함, 없으면 None)
+        """
+        try:
+            doc_ref = self.airlines_collection.document(airline_code)
+            doc = await run_in_threadpool(doc_ref.get)
+            
+            if not doc.exists:
+                return None
+            
+            data = doc.to_dict()
+            
+            # overallRating 계산
+            if "overallRating" in data and data["overallRating"] is not None:
+                overall_rating = data["overallRating"]
+            else:
+                avg_ratings = data.get("averageRatings", {})
+                if avg_ratings:
+                    overall_rating = round(sum(avg_ratings.values()) / len(avg_ratings), 2)
+                else:
+                    overall_rating = 0.0
+                data["overallRating"] = overall_rating
+            
+            # BIMO 요약 포함 (Firebase에 저장된 값 사용)
+            # bimoSummary가 없으면 None으로 설정 (백그라운드에서 갱신됨)
+            if "bimoSummary" not in data:
+                data["bimoSummary"] = None
+            
+            return AirlineSchema(**data)
+        except Exception as e:
+            if isinstance(e, CustomException):
+                raise e
+            raise DatabaseError(message=f"항공사 정보 조회 중 오류 발생: {e}")
+    
     # Private helper methods
     
     @staticmethod
