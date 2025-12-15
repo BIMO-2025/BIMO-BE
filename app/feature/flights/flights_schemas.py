@@ -91,73 +91,42 @@ class MyFlightSchema(BaseModel):
     model_config = ConfigDict(
         from_attributes=True,
         json_schema_extra={
-            "examples": [
-                {
-                    "description": "경유 항공편 (segments 2개 이상)",
-                    "value": {
-                        "segments": [
-                            {
-                                "operating_carrier": "KE",
-                                "flight_number": "KE901",
-                                "duration": "3H30M",
-                                "departure": {
-                                    "iata_code": "ICN",
-                                    "at": "2025-12-25T10:00:00Z"
-                                },
-                                "arrival": {
-                                    "iata_code": "NRT",
-                                    "at": "2025-12-25T13:30:00Z"
-                                }
-                            },
-                            {
-                                "operating_carrier": "KE",
-                                "flight_number": "KE001",
-                                "duration": "11H00M",
-                                "departure": {
-                                    "iata_code": "NRT",
-                                    "at": "2025-12-25T15:00:00Z"
-                                },
-                                "arrival": {
-                                    "iata_code": "JFK",
-                                    "at": "2025-12-25T20:30:00Z"
-                                }
-                            }
-                        ],
-                        "departureTime": "2025-12-25T10:00:00Z",
-                        "arrivalTime": "2025-12-25T20:30:00Z",
-                        "status": "scheduled",
-                        "departureAirport": "ICN",
-                        "arrivalAirport": "JFK",
-                        "hasStopover": True
+            "example": {
+                "segments": [
+                    {
+                        "operating_carrier": "KE",
+                        "flight_number": "KE901",
+                        "duration": "3H30M",
+                        "departure": {
+                            "iata_code": "ICN",
+                            "at": "2025-12-25T10:00:00Z"
+                        },
+                        "arrival": {
+                            "iata_code": "NRT",
+                            "at": "2025-12-25T13:30:00Z"
+                        }
+                    },
+                    {
+                        "operating_carrier": "KE",
+                        "flight_number": "KE001",
+                        "duration": "11H00M",
+                        "departure": {
+                            "iata_code": "NRT",
+                            "at": "2025-12-25T15:00:00Z"
+                        },
+                        "arrival": {
+                            "iata_code": "JFK",
+                            "at": "2025-12-25T20:30:00Z"
+                        }
                     }
-                },
-                {
-                    "description": "직항 항공편 (segments 1개)",
-                    "value": {
-                        "segments": [
-                            {
-                                "operating_carrier": "KE",
-                                "flight_number": "KE901",
-                                "duration": "14H30M",
-                                "departure": {
-                                    "iata_code": "ICN",
-                                    "at": "2025-12-25T13:45:00Z"
-                                },
-                                "arrival": {
-                                    "iata_code": "JFK",
-                                    "at": "2025-12-25T18:20:00Z"
-                                }
-                            }
-                        ],
-                "departureTime": "2025-12-25T13:45:00Z",
-                "arrivalTime": "2025-12-25T18:20:00Z",
+                ],
+                "departureTime": "2025-12-25T10:00:00Z",
+                "arrivalTime": "2025-12-25T20:30:00Z",
                 "status": "scheduled",
                 "departureAirport": "ICN",
                 "arrivalAirport": "JFK",
-                        "hasStopover": False
-                    }
+                "hasStopover": True
             }
-            ]
         }
     )
 
@@ -481,6 +450,8 @@ class AirlineSearchResponseItem(BaseModel):
     flight_number: str = Field(..., description="항공편명 (첫 번째 구간의 항공편명, 예: KE123)")
     total_duration: str = Field(..., description="총 비행 시간 (예: 14H30M)")
     segments: List[SegmentDetailSchema] = Field(..., description="각 구간별 비행 시간 및 정보 (경유일 경우 여러 개)")
+    overall_rating: Optional[float] = Field(None, description="항공사 전체 평점 (Firestore에서 조회, 없으면 null)")
+    total_reviews: Optional[int] = Field(None, description="총 리뷰 수 (Firestore에서 조회, 없으면 null)")
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -490,6 +461,8 @@ class AirlineSearchResponseItem(BaseModel):
                 "has_stopover": False,
                 "flight_number": "KE123",
                 "total_duration": "14H30M",
+                "overall_rating": 4.2,
+                "total_reviews": 1250,
                 "segments": [
                     {
                         "operating_carrier": "KE",

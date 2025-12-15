@@ -43,6 +43,7 @@ class FlightsService:
         if firebase_service:
             self.db = firebase_service.db
             self.airports_collection = self.db.collection("airports")
+            self.airlines_collection = self.db.collection("airlines")
     
     @staticmethod
     def _format_duration(duration: str) -> str:
@@ -307,6 +308,57 @@ class FlightsService:
         # 3. 둘 다 없으면 0M 반환
         return "0M"
 
+    async def _fetch_airlines_batch(self, airline_codes: List[str]) -> Dict[str, Dict[str, float | int]]:
+        """
+        여러 항공사 코드로 Firestore에서 배치 조회
+        
+        Args:
+            airline_codes: 항공사 코드 리스트 (예: ["KE", "OZ", "SQ"])
+            
+        Returns:
+            {airline_code: {"overallRating": float, "totalReviews": int}} 딕셔너리
+            존재하지 않는 항공사는 딕셔너리에 포함하지 않음
+        """
+        if not airline_codes or not self.firebase_service:
+            return {}
+        
+        result = {}
+        
+        def _fetch():
+            """동기 함수로 Firestore 문서들을 조회"""
+            docs = {}
+            for code in airline_codes:
+                doc_ref = self.airlines_collection.document(code)
+                doc = doc_ref.get()
+                if doc.exists:
+                    docs[code] = doc
+            return docs
+        
+        docs = await run_in_threadpool(_fetch)
+        
+        for code, doc in docs.items():
+            data = doc.to_dict()
+            if data:
+                # overallRating 계산 (get_airline_statistics와 동일한 로직)
+                if "overallRating" in data and data["overallRating"] is not None:
+                    overall_rating = data["overallRating"]
+                else:
+                    # 전체 평균 평점 계산 (overallRating이 없는 경우에만)
+                    avg_ratings = data.get("averageRatings", {})
+                    if avg_ratings:
+                        overall_rating = round(sum(avg_ratings.values()) / len(avg_ratings), 2)
+                    else:
+                        overall_rating = 0.0
+                
+                total_reviews = data.get("totalReviews", 0)
+                
+                result[code] = {
+                    "overallRating": overall_rating,
+                    "totalReviews": total_reviews
+                }
+        
+        return result
+
     async def search_airlines(self, request: AirlineSearchRequest) -> AirlineSearchResponse:
         """
         Duffel API를 사용하여 항공편을 검색하고, 동일한 operating carrier만 필터링하여 반환합니다.
@@ -337,8 +389,9 @@ class FlightsService:
             if not offers:
                 return AirlineSearchResponse(count=0, results=[])
             
-            # 3. 동일한 operating carrier만 필터링
-            filtered_results = []
+            # 3. 동일한 operating carrier만 필터링 및 항공사 코드 수집
+            filtered_offers = []
+            airline_codes_set = set()
             
             for offer in offers:
                 try:
@@ -418,20 +471,52 @@ class FlightsService:
                             )
                         )
                     
-                    filtered_results.append(
-                        AirlineSearchResponseItem(
-                            operating_carrier=operating_carrier,
-                            logo_symbol_url=logo_symbol_url,
-                            has_stopover=has_stopover,
-                            flight_number=first_flight_number,
-                            total_duration=total_duration,
-                            segments=segment_details,
-                        )
-                    )
+                    # 필터링된 offer 정보 저장
+                    filtered_offers.append({
+                        "operating_carrier": operating_carrier,
+                        "logo_symbol_url": logo_symbol_url,
+                        "has_stopover": has_stopover,
+                        "flight_number": first_flight_number,
+                        "total_duration": total_duration,
+                        "segments": segment_details,
+                    })
+                    
+                    # 항공사 코드 수집
+                    airline_codes_set.add(operating_carrier)
                     
                 except Exception as e:
                     logger.warning(f"Offer 파싱 실패: {str(e)}")
                     continue
+            
+            # 4. 항공사 정보 배치 조회
+            airline_info_map = {}
+            if airline_codes_set:
+                airline_info_map = await self._fetch_airlines_batch(list(airline_codes_set))
+            
+            # 5. 결과 생성 시 항공사 정보 병합
+            filtered_results = []
+            for offer_data in filtered_offers:
+                operating_carrier = offer_data["operating_carrier"]
+                airline_info = airline_info_map.get(operating_carrier, {})
+                
+                filtered_results.append(
+                    AirlineSearchResponseItem(
+                        operating_carrier=operating_carrier,
+                        logo_symbol_url=offer_data["logo_symbol_url"],
+                        has_stopover=offer_data["has_stopover"],
+                        flight_number=offer_data["flight_number"],
+                        total_duration=offer_data["total_duration"],
+                        segments=offer_data["segments"],
+                        overall_rating=airline_info.get("overallRating"),
+                        total_reviews=airline_info.get("totalReviews"),
+                    )
+                )
+            
+            # 6. overallRating 기준 내림차순 정렬 (None 값은 맨 뒤로)
+            filtered_results.sort(
+                key=lambda x: (x.overall_rating is None, -(x.overall_rating or 0)),
+                reverse=False
+            )
             
             return AirlineSearchResponse(
                 count=len(filtered_results),
