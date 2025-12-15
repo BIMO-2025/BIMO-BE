@@ -40,9 +40,37 @@ class _AsyncTTLCache:
             self._value = value
             self._expires_at = time.time() + self._ttl_seconds
 
+    async def get_or_set(self, loader):
+        """캐시가 비었거나 만료되었으면 loader로 채운 뒤 반환합니다.
+
+        loader: async callable (no-arg) -> value
+        """
+        cached = await self.get()
+        if cached is not None:
+            return cached
+
+        async with self._lock:
+            # lock 획득 후 다시 확인 (single-flight)
+            cached = await self.get()
+            if cached is not None:
+                return cached
+            value = await loader()
+            self._value = value
+            self._expires_at = time.time() + self._ttl_seconds
+            return value
+
+    def clear(self):
+        """테스트/운영 중 수동 무효화를 위한 캐시 초기화."""
+        self._value = None
+        self._expires_at = 0.0
+
 
 # /airlines/sorting 결과(상위 10개)를 짧게 캐싱해서 트래픽이 있을 때 Firestore read를 크게 줄입니다.
 _AIRLINES_SORTED_TOP10_CACHE = _AsyncTTLCache(ttl_seconds=60)
+
+# /airlines/search에서 전체 airlines를 매 요청마다 읽지 않도록, 전체 목록을 짧게 캐싱합니다.
+# (Firestore는 기본적으로 substring(contains) 검색이 어려워, 동작을 유지하려면 메모리 필터링이 필요)
+_AIRLINES_ALL_CACHE = _AsyncTTLCache(ttl_seconds=300)
 
 
 class AirlineService:
@@ -83,6 +111,33 @@ class AirlineService:
         if v == 0:
             return 0
         return (v / (v + m)) * R + (m / (v + m)) * C
+
+    @staticmethod
+    def _extract_overall_rating(data: dict) -> float:
+        """airlines 문서에서 overallRating을 최대한 일관되게 추출합니다.
+
+        우선순위:
+        1) overallRating (집계 필드)
+        2) averageRatings['overall'] (문서 스키마에 따라 존재 가능)
+        3) averageRatings 평균(값이 숫자라는 가정)
+        """
+        if "overallRating" in data and data["overallRating"] is not None:
+            return float(data["overallRating"])
+
+        avg_ratings = data.get("averageRatings", {})
+        if isinstance(avg_ratings, dict) and avg_ratings:
+            if "overall" in avg_ratings and avg_ratings["overall"] is not None:
+                try:
+                    return float(avg_ratings["overall"])
+                except Exception:
+                    return 0.0
+            try:
+                values = [float(v) for v in avg_ratings.values() if v is not None]
+                return round(sum(values) / len(values), 2) if values else 0.0
+            except Exception:
+                return 0.0
+
+        return 0.0
     
     async def search_airlines(self, query: str) -> List[Airline]:
         """
@@ -98,31 +153,33 @@ class AirlineService:
             return []
             
         try:
-            # 데모 로직: 전체 다 가져와서 필터링 (데이터가 적다는 가정)
-            # 프로덕션에서는 Algolia 등 전문 검색 엔진 사용 권장
-            docs = await run_in_threadpool(lambda: list(self.airlines_collection.stream()))
-            results = []
-            query_lower = query.lower()
-            
-            for doc in docs:
-                data = doc.to_dict()
-                airline_name = data.get("airlineName", "")
-                
-                if query_lower in airline_name.lower():
-                    airline = Airline(
-                        id=doc.id,
-                        name=airline_name,
-                        code=doc.id,
-                        country=data.get("country", ""),
-                        alliance=data.get("alliance"),
-                        type=data.get("type", "FSC"),
-                        rating=data.get("overallRating", 0.0),
-                        review_count=data.get("totalReviews", 0),
-                        logo_url=data.get("logoUrl"),
+            # substring(contains) 검색을 유지하기 위해 서버에서 필터링이 필요합니다.
+            # 다만 매 요청마다 Firestore 전체 read를 피하기 위해 전체 목록을 TTL 캐싱합니다.
+            async def _load_all_airlines() -> List[Airline]:
+                docs = await run_in_threadpool(lambda: list(self.airlines_collection.stream()))
+                all_airlines: List[Airline] = []
+                for doc in docs:
+                    data = doc.to_dict()
+                    airline_name = data.get("airlineName", "")
+                    all_airlines.append(
+                        Airline(
+                            id=doc.id,
+                            name=airline_name,
+                            code=doc.id,
+                            country=data.get("country", ""),
+                            alliance=data.get("alliance"),
+                            type=data.get("type", "FSC"),
+                            rating=self._extract_overall_rating(data),
+                            review_count=data.get("totalReviews", 0),
+                            logo_url=data.get("logoUrl"),
+                        )
                     )
-                    results.append(airline)
-            
-            return results
+                return all_airlines
+
+            all_airlines = await _AIRLINES_ALL_CACHE.get_or_set(_load_all_airlines)
+
+            query_lower = query.lower()
+            return [a for a in all_airlines if query_lower in (a.name or "").lower()]
         except Exception as e:
             if isinstance(e, CustomException):
                 raise e
@@ -279,6 +336,9 @@ class AirlineService:
             return result
 
         except Exception as e:
+            # 입력값 검증 오류는 그대로 올려서 FastAPI/상위 레이어에서 4xx로 처리할 수 있게 합니다.
+            if isinstance(e, ValueError):
+                raise
             if isinstance(e, CustomException):
                 raise e
             raise DatabaseError(message=f"주차별 인기 항공사 조회 중 오류 발생: {e}")
@@ -401,16 +461,7 @@ class AirlineService:
             for doc in docs:
                 data = doc.to_dict()
                 
-                # overallRating 계산 (get_airline_statistics와 동일한 로직)
-                if "overallRating" in data and data["overallRating"] is not None:
-                    overall_rating = data["overallRating"]
-                else:
-                    # 전체 평균 평점 계산 (overallRating이 없는 경우에만)
-                    avg_ratings = data.get("averageRatings", {})
-                    if avg_ratings:
-                        overall_rating = round(sum(avg_ratings.values()) / len(avg_ratings), 2)
-                    else:
-                        overall_rating = 0.0
+                overall_rating = self._extract_overall_rating(data)
                 
                 airline = Airline(
                     id=doc.id,

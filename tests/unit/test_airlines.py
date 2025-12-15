@@ -21,6 +21,10 @@ def mock_firebase_service():
 @pytest.fixture
 def airline_service(mock_firebase_service):
     """AirlineService 인스턴스 생성"""
+    # 전역 TTL 캐시가 테스트 간에 영향을 주지 않도록 초기화
+    import app.feature.airlines.airline_service as airline_service_module
+    airline_service_module._AIRLINES_SORTED_TOP10_CACHE.clear()
+    airline_service_module._AIRLINES_ALL_CACHE.clear()
     return AirlineService(firebase_service=mock_firebase_service)
 
 
