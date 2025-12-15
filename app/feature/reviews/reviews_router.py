@@ -9,7 +9,8 @@ from typing import Optional, Annotated
 
 from app.core.deps import get_firebase_service, get_gemini_client
 from app.core.firebase import FirebaseService
-from app.core.security import verify_firebase_token
+from app.core.security import decode_access_token
+from app.core.exceptions.exceptions import InvalidTokenError
 from app.feature.llm.gemini_client import GeminiClient
 from app.feature.reviews.reviews_service import ReviewsService
 from app.feature.reviews import reviews_schemas
@@ -150,8 +151,11 @@ async def create_review(
     try:
         # 토큰 검증
         token = credentials.credentials
-        decoded_token = verify_firebase_token(token)
-        user_id = decoded_token.get("uid")
+        payload = decode_access_token(token)  # 우리 서비스 JWT 디코딩
+        user_id = payload.get("sub")
+        
+        if not user_id:
+            raise HTTPException(status_code=401, detail="유효하지 않은 토큰입니다.")
         
         # 리뷰 생성
         created_review = await service.create_review(review, user_id)
@@ -170,6 +174,8 @@ async def create_review(
         return created_review
     except HTTPException:
         raise
+    except InvalidTokenError:
+        raise HTTPException(status_code=401, detail="유효하지 않은 토큰입니다.")
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -197,8 +203,11 @@ async def update_review(
     try:
         # 토큰 검증
         token = credentials.credentials
-        decoded_token = verify_firebase_token(token)
-        user_id = decoded_token.get("uid")
+        payload = decode_access_token(token)  # 우리 서비스 JWT 디코딩
+        user_id = payload.get("sub")
+        
+        if not user_id:
+            raise HTTPException(status_code=401, detail="유효하지 않은 토큰입니다.")
         
         # 기존 리뷰 조회 (항공사 코드 변경 확인용)
         old_review = await service.get_review_by_id(review_id)
@@ -232,6 +241,8 @@ async def update_review(
         return updated_review
     except HTTPException:
         raise
+    except InvalidTokenError:
+        raise HTTPException(status_code=401, detail="유효하지 않은 토큰입니다.")
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
@@ -259,8 +270,11 @@ async def delete_review(
     try:
         # 토큰 검증
         token = credentials.credentials
-        decoded_token = verify_firebase_token(token)
-        user_id = decoded_token.get("uid")
+        payload = decode_access_token(token)  # 우리 서비스 JWT 디코딩
+        user_id = payload.get("sub")
+        
+        if not user_id:
+            raise HTTPException(status_code=401, detail="유효하지 않은 토큰입니다.")
         
         # 삭제 전 리뷰 정보 조회 (항공사 코드 확인용)
         old_review = await service.get_review_by_id(review_id)
@@ -283,5 +297,7 @@ async def delete_review(
         return result
     except HTTPException:
         raise
+    except InvalidTokenError:
+        raise HTTPException(status_code=401, detail="유효하지 않은 토큰입니다.")
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))

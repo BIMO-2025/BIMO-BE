@@ -3,14 +3,15 @@
 """
 
 from typing import List, Optional
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Body
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 from app.feature.flights.flights_schemas import MyFlightSchema
 from app.feature.flights.my_flights_service import MyFlightsService
-from app.core.security import verify_firebase_token
+from app.core.security import decode_access_token
 from app.core.deps import get_firebase_service
 from app.core.firebase import FirebaseService
+from app.core.exceptions.exceptions import InvalidTokenError
 
 router = APIRouter(
     prefix="/users/{user_id}/my-flights",
@@ -33,7 +34,7 @@ async def get_current_user_id(
     user_id: str = None
 ) -> str:
     """
-    Firebase 토큰에서 사용자 ID를 추출하고 검증합니다.
+    JWT 토큰에서 사용자 ID를 추출하고 검증합니다.
     
     Args:
         credentials: HTTP Bearer 토큰
@@ -46,18 +47,26 @@ async def get_current_user_id(
         HTTPException: 토큰이 유효하지 않거나 사용자 ID가 일치하지 않는 경우
     """
     token = credentials.credentials
-    decoded_token = verify_firebase_token(token)
     
-    token_user_id = decoded_token.get("uid")
-    
-    # 경로의 user_id와 토큰의 user_id가 일치하는지 확인
-    if user_id and token_user_id != user_id:
-        raise HTTPException(
-            status_code=403,
-            detail="이 리소스에 접근할 권한이 없습니다"
-        )
-    
-    return token_user_id or user_id
+    try:
+        # 우리 서비스 JWT 토큰 디코딩
+        payload = decode_access_token(token)
+        token_user_id = payload.get("sub")
+        
+        if not token_user_id:
+            raise HTTPException(status_code=401, detail="유효하지 않은 토큰입니다.")
+        
+        # 경로의 user_id와 토큰의 user_id가 일치하는지 확인
+        if user_id and token_user_id != user_id:
+            raise HTTPException(
+                status_code=403,
+                detail="이 리소스에 접근할 권한이 없습니다"
+            )
+        
+        return token_user_id or user_id
+        
+    except InvalidTokenError:
+        raise HTTPException(status_code=401, detail="유효하지 않은 토큰입니다.")
 
 
 @router.post("", response_model=dict)
@@ -70,12 +79,18 @@ async def create_my_flight(
     """
     사용자의 비행 기록을 생성합니다.
     
-    - **flightNumber**: 항공편 번호 (예: "KE901")
-    - **airlineCode**: 항공사 코드 (예: "KE")
-    - **departureTime**: 출발 시간 (ISO 8601 형식)
-    - **arrivalTime**: 도착 시간 (ISO 8601 형식)
-    - **status**: 비행 상태 ("scheduled" 또는 "completed")
+    - **segments**: 항공편 구간 정보 리스트 (필수, 최소 1개)
+      - 직항: 1개의 segment
+      - 경유: 2개 이상의 segment
+      - 각 segment는 operating_carrier, flight_number, duration, departure, arrival 정보 포함
+      - segments[0].operating_carrier와 segments[0].flight_number가 기본 항공편 정보로 사용됨
+    - **departureTime**: 출발 시간 (ISO 8601 형식, 필수) - 전체 여정의 첫 출발 시간 (segments[0].departure.at과 일치)
+    - **arrivalTime**: 도착 시간 (ISO 8601 형식, 필수) - 전체 여정의 마지막 도착 시간 (segments[-1].arrival.at과 일치)
+    - **status**: 비행 상태 (필수, "scheduled" 또는 "completed")
+    - **departureAirport**: 출발 공항 코드 (선택적, 예: "ICN", segments[0].departure.iata_code와 일치 권장)
+    - **arrivalAirport**: 도착 공항 코드 (선택적, 예: "JFK", segments[-1].arrival.iata_code와 일치 권장)
     - **reviewId**: 리뷰 ID (선택적)
+    - **hasStopover**: 경유 여부 (선택적, segments가 2개 이상이면 자동으로 True)
     """
     flight_id = await service.create_flight(user_id, flight_data)
     return {"id": flight_id, "message": "비행 기록이 생성되었습니다."}

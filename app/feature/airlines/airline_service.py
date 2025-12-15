@@ -182,9 +182,10 @@ class AirlineService:
             start_date, end_date = self._get_week_date_range(year, month, week)
 
             # 1) 해당 기간 리뷰 조회
+            from google.cloud.firestore_v1.base_query import FieldFilter
             query = (
-                self.reviews_collection.where("createdAt", ">=", start_date)
-                .where("createdAt", "<", end_date)
+                self.reviews_collection.where(filter=FieldFilter("createdAt", ">=", start_date))
+                .where(filter=FieldFilter("createdAt", "<", end_date))
             )
             review_docs = await run_in_threadpool(lambda: list(query.stream()))
 
@@ -325,6 +326,11 @@ class AirlineService:
                 return None
             
             data = doc.to_dict()
+            
+            # 필수 필드 확인 및 기본값 설정
+            if "airlineName" not in data or not data["airlineName"]:
+                # airlineName이 없으면 문서가 유효하지 않은 것으로 간주
+                return None
             
             # Firestore에 저장된 overallRating이 있으면 우선 사용, 없으면 계산
             if "overallRating" in data and data["overallRating"] is not None:

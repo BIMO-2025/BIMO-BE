@@ -166,6 +166,33 @@ class FlightsService:
         return None
 
     @staticmethod
+    def _extract_logo_symbol_url(segment: Dict) -> str | None:
+        """
+        segment에서 logo_symbol_url 추출 (Duffel API 응답에서)
+        
+        Args:
+            segment: segment 딕셔너리
+            
+        Returns:
+            logo_symbol_url 또는 None
+        """
+        # operating_carrier 객체에서 logo_symbol_url 추출
+        operating_carrier_obj = segment.get("operating_carrier")
+        if isinstance(operating_carrier_obj, dict):
+            logo_url = operating_carrier_obj.get("logo_symbol_url")
+            if logo_url:
+                return logo_url
+        
+        # airline 객체에서 logo_symbol_url 추출
+        airline_obj = segment.get("airline")
+        if isinstance(airline_obj, dict):
+            logo_url = airline_obj.get("logo_symbol_url")
+            if logo_url:
+                return logo_url
+        
+        return None
+
+    @staticmethod
     def _is_same_operating_carrier(segments: List[Dict]) -> bool:
         """
         모든 segment의 operating_carrier가 동일한지 확인
@@ -340,6 +367,9 @@ class FlightsService:
                     # 경유 여부 확인 (segment가 1개면 직항, 2개 이상이면 경유)
                     has_stopover = len(segments) > 1
                     
+                    # 첫 번째 segment에서 logo_symbol_url 추출 (Duffel API 응답에서)
+                    logo_symbol_url = self._extract_logo_symbol_url(first_segment)
+                    
                     # 항공편명 생성 헬퍼 함수
                     def get_flight_number(segment: Dict, carrier: str) -> str:
                         """operating_carrier IATA 코드 + operating_carrier_flight_number로 항공편명 생성"""
@@ -391,6 +421,7 @@ class FlightsService:
                     filtered_results.append(
                         AirlineSearchResponseItem(
                             operating_carrier=operating_carrier,
+                            logo_symbol_url=logo_symbol_url,
                             has_stopover=has_stopover,
                             flight_number=first_flight_number,
                             total_duration=total_duration,

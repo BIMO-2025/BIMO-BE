@@ -134,9 +134,9 @@ async def generate_jetlag_plan_from_my_flight(
             detail="비행 기록을 찾을 수 없습니다."
         )
     
-    # MyFlightSchema를 FlightSegment로 변환
+    # MyFlightSchema를 FlightSegment 리스트로 변환
     try:
-        flight_segment = wellness_service.convert_my_flight_to_segment(my_flight)
+        flight_segments = wellness_service.convert_my_flight_to_segment(my_flight)
     except ValueError as e:
         raise HTTPException(
             status_code=400,
@@ -145,7 +145,7 @@ async def generate_jetlag_plan_from_my_flight(
     
     # JetLagPlanRequest 생성
     request = wellness_schemas.JetLagPlanRequest(
-        flight_segments=[flight_segment],
+        flight_segments=flight_segments,
         destination_timezone=destination_timezone,
         origin_timezone=origin_timezone,
         user_sleep_pattern_start=user_sleep_pattern_start,
