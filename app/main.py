@@ -56,10 +56,11 @@ async def lifespan(app: FastAPI):
     app.state.duffel_client = get_duffel_client()
     print("[OK] Duffel client ready")
     
-    # Gemini 클라이언트 (lazy initialization으로 필요시 초기화됨)
-    from app.feature.llm.gemini_client import get_gemini_client
-    app.state.gemini_client = get_gemini_client()
-    print("[OK] Gemini client ready")
+    # Ollama 클라이언트 (lazy initialization으로 필요시 초기화됨)
+    from app.feature.llm.ollama_client import get_ollama_client
+    app.state.ollama_client = get_ollama_client()
+    print("[OK] Ollama client ready")
+
     
     # 2. 네트워크 모니터링 서비스
     # -------------------------

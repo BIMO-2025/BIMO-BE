@@ -18,3 +18,4 @@ async def chat_with_gemini(request: llm_schemas.LLMChatRequest):
         model=llm_service.MODEL_NAME,
         content=content,
     )
+

@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from app.core.network_monitor import NetworkMonitor
     from app.core.firebase import FirebaseService
     from app.core.clients.duffel import DuffelClient
-    from app.feature.llm.gemini_client import GeminiClient
+    from app.feature.llm.ollama_client import OllamaClient
     from app.feature.offline.offline_service import OfflineService
 
 
@@ -52,15 +52,15 @@ def get_duffel_client() -> "DuffelClient":
     return _get_duffel()
 
 
-def get_gemini_client() -> "GeminiClient":
+def get_ollama_client() -> "OllamaClient":
     """
-    Gemini 클라이언트 반환
+    Ollama 클라이언트 반환
     
     Returns:
-        GeminiClient 인스턴스
+        OllamaClient 인스턴스
     """
-    from app.feature.llm.gemini_client import get_gemini_client as _get_gemini
-    return _get_gemini()
+    from app.feature.llm.ollama_client import get_ollama_client as _get_ollama
+    return _get_ollama()
 
 
 # =============================================================================
