@@ -25,6 +25,9 @@ google-generativeai>=0.3.0
 # 이미지 처리
 Pillow>=10.0.0
 
+# 파일 업로드 (FastAPI Form/File 처리)
+python-multipart>=0.0.6
+
 # 시간대 처리 (시차적응 알고리즘)
 pytz>=2024.1
 
