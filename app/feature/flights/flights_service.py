@@ -289,7 +289,7 @@ class FlightsService:
 
     async def search_locations(self, keyword: str) -> LocationSearchResponse:
         """
-        키워드를 기반으로 공항 및 도시를 검색합니다.
+        키워드를 기반으로 공항을 검색합니다 (AIRPORT만 반환).
         1) 로컬 Firestore 'airports' 컬렉션 우선 검색 (오프라인/캐시된 추천)
         2) Amadeus API 검색 결과를 병합 (중복 IATA 제거)
         """
@@ -304,15 +304,18 @@ class FlightsService:
                     seen_codes.add(loc.iata_code)
                     combined.append(loc)
 
-            # 2) Amadeus API 호출 (보조)
+            # 2) Amadeus API 호출 (보조) - AIRPORT만 검색
             locations_data = await self.amadeus_client.search_locations(
                 keyword=keyword,
-                sub_type=["AIRPORT", "CITY"],
+                sub_type=["AIRPORT"],
             )
 
             for loc in locations_data:
                 try:
                     subtype = loc.get("subType", "").upper()
+                    # AIRPORT만 필터링
+                    if subtype != "AIRPORT":
+                        continue
                     iata = loc.get("iataCode", "")
                     if iata in seen_codes:
                         continue
@@ -331,9 +334,12 @@ class FlightsService:
                     print(f"위치 데이터 파싱 실패: {e}")
                     continue
 
+            # 최종 결과에서 AIRPORT만 필터링 (안전장치)
+            filtered_locations = [loc for loc in combined if loc.sub_type == "AIRPORT"]
+
             return LocationSearchResponse(
-                locations=combined,
-                count=len(combined),
+                locations=filtered_locations,
+                count=len(filtered_locations),
             )
 
         except ExternalApiError:

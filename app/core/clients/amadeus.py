@@ -180,7 +180,7 @@ class AmadeusClient:
                             departureDate=departure_date,
                             returnDate=return_date,
                             adults=adults,
-                            max=75,
+                            max=50,  # 최대 50개 결과 반환
                         )
                     else:
                         # 편도 항공편 검색
@@ -189,7 +189,7 @@ class AmadeusClient:
                             destinationLocationCode=destination.upper(),
                             departureDate=departure_date,
                             adults=adults,
-                            max=75,
+                            max=50,  # 최대 50개 결과 반환
                         )
 
                     # 응답 데이터 반환
