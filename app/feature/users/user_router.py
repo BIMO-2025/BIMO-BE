@@ -57,6 +57,37 @@ async def get_current_user_id(authorization: Optional[str] = Header(None)) -> st
         raise HTTPException(status_code=401, detail="유효하지 않은 토큰입니다.")
 
 
+@router.get("/profile", response_model=UserInfo)
+async def get_user_profile(
+    uid: str = Depends(get_current_user_id)
+):
+    """
+    사용자 프로필 정보를 조회합니다.
+    
+    Returns:
+        - **uid**: 사용자 UID
+        - **email**: 이메일
+        - **display_name**: 닉네임
+        - **photo_url**: 프로필 사진 URL
+        - **provider_id**: 로그인 제공자 (google.com, apple.com, kakao.com)
+    """
+    try:
+        user = await UserService.get_user_profile(uid=uid)
+        
+        return UserInfo(
+            uid=user.uid,
+            email=user.email,
+            display_name=user.display_name,
+            photo_url=user.photo_url,
+            provider_id=user.provider_id
+        )
+        
+    except UserProfileNotFoundError:
+        raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"서버 오류가 발생했습니다: {str(e)}")
+
+
 @router.put("/nickname", response_model=users_schemas.UpdateNicknameResponse)
 async def update_nickname(
     request: users_schemas.UpdateNicknameRequest,
@@ -111,3 +142,65 @@ async def update_nickname(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"서버 오류가 발생했습니다: {str(e)}")
 
+
+@router.put("/sleep-pattern", response_model=users_schemas.UpdateSleepPatternResponse)
+async def update_sleep_pattern(
+    request: users_schemas.UpdateSleepPatternRequest,
+    uid: str = Depends(get_current_user_id)
+):
+    """
+    사용자의 수면 패턴을 업데이트합니다.
+    
+    - **sleepPatternStart**: 수면 시작 시간 (HH:MM 형식, 예: "23:00")
+    - **sleepPatternEnd**: 수면 종료 시간 (HH:MM 형식, 예: "07:00")
+    
+    Returns:
+        - **success**: 성공 여부
+        - **message**: 결과 메시지
+        - **sleepPatternStart**: 업데이트된 수면 시작 시간
+        - **sleepPatternEnd**: 업데이트된 수면 종료 시간
+    """
+    try:
+        # 서비스를 통해 수면 패턴 업데이트
+        result = await UserService.update_sleep_pattern(
+            uid=uid,
+            sleep_start=request.sleepPatternStart,
+            sleep_end=request.sleepPatternEnd
+        )
+        
+        return users_schemas.UpdateSleepPatternResponse(
+            success=True,
+            message="수면 패턴이 성공적으로 업데이트되었습니다.",
+            sleepPatternStart=result["sleepPatternStart"],
+            sleepPatternEnd=result["sleepPatternEnd"]
+        )
+        
+    except UserProfileNotFoundError:
+        raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
+    except DatabaseError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"서버 오류가 발생했습니다: {str(e)}")
+
+
+@router.get("/sleep-pattern")
+async def get_sleep_pattern(
+    uid: str = Depends(get_current_user_id)
+):
+    """
+    사용자의 현재 수면 패턴을 조회합니다.
+    
+    Returns:
+        - **sleepPatternStart**: 수면 시작 시간 (HH:MM 형식)
+        - **sleepPatternEnd**: 수면 종료 시간 (HH:MM 형식)
+    """
+    try:
+        result = await UserService.get_sleep_pattern(uid=uid)
+        return result
+        
+    except UserProfileNotFoundError:
+        raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"서버 오류가 발생했습니다: {str(e)}")

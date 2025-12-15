@@ -301,3 +301,74 @@ async def delete_review(
         raise HTTPException(status_code=401, detail="유효하지 않은 토큰입니다.")
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/users/{user_id}/reviews", response_model=reviews_schemas.MyReviewsResponse)
+async def get_my_reviews(
+    user_id: str,
+    limit: int = Query(20, ge=1, le=100, description="조회할 리뷰 개수"),
+    offset: int = Query(0, ge=0, description="오프셋 (페이지네이션)"),
+    sort: str = Query("latest", description="정렬 옵션: latest, rating_high, rating_low"),
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    service: ReviewsService = Depends(get_reviews_service)
+):
+    """
+    사용자가 작성한 리뷰 목록을 조회합니다 (총 개수 포함).
+    
+    - **인증 필요**: Bearer Token (본인의 리뷰만 조회 가능)
+    
+    ### Path Parameters
+    - **user_id**: 사용자 ID
+    
+    ### Query Parameters
+    - **limit**: 조회할 리뷰 개수 (기본값: 20, 최대: 100)
+    - **offset**: 오프셋 (페이지네이션, 기본값: 0)
+    - **sort**: 정렬 옵션
+      - `latest`: 최신순 (기본값)
+      - `rating_high`: 평점 높은 순
+      - `rating_low`: 평점 낮은 순
+    
+    ### Returns
+    ```json
+    {
+      "user_id": "kMnkTjxuKRy8QWjBzt8xRk6kGG2",
+      "total_count": 15,
+      "reviews": [...],
+      "has_more": true
+    }
+    ```
+    
+    ### Example
+    ```
+    GET /reviews/users/{user_id}/reviews?limit=20&sort=latest
+    ```
+    """
+    try:
+        # 토큰 검증
+        token = credentials.credentials
+        decoded_token = verify_firebase_token(token)
+        token_user_id = decoded_token.get("uid")
+        
+        # 본인의 리뷰만 조회 가능
+        if token_user_id != user_id:
+            raise HTTPException(
+                status_code=403,
+                detail="본인의 리뷰만 조회할 수 있습니다."
+            )
+        
+        # 사용자 리뷰 조회 (total_count, has_more 포함)
+        response = await service.get_reviews_by_user(
+            user_id=user_id,
+            limit=limit,
+            offset=offset,
+            sort=sort
+        )
+        
+        return response
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"서버 오류가 발생했습니다: {str(e)}")
+
+

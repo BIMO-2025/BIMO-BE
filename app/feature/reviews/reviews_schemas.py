@@ -148,3 +148,13 @@ class FilteredReviewsResponse(BaseModel):
     has_more: bool = Field(..., description="더 많은 리뷰가 있는지 여부")
     
     model_config = ConfigDict(from_attributes=True)
+
+
+class MyReviewsResponse(BaseModel):
+    """사용자가 작성한 리뷰 응답 스키마"""
+    user_id: str = Field(..., description="사용자 ID")
+    total_count: int = Field(..., description="전체 리뷰 개수")
+    reviews: List[ReviewSchema] = Field(..., description="리뷰 목록")
+    has_more: bool = Field(..., description="더 많은 리뷰가 있는지 여부")
+    
+    model_config = ConfigDict(from_attributes=True)

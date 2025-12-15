@@ -888,3 +888,87 @@ class ReviewsService:
             # BIMO 요약 업데이트 실패는 로그만 남기고 계속 진행
             print(f"BIMO 요약 업데이트 실패 ({airline_code}): {e}")
 
+    async def get_reviews_by_user(
+        self,
+        user_id: str,
+        limit: int = 20,
+        offset: int = 0,
+        sort: str = "latest"
+    ):
+        """
+        사용자가 작성한 리뷰를 조회합니다.
+        
+        Args:
+            user_id: 사용자 ID
+            limit: 조회할 리뷰 개수 (기본값: 20)
+            offset: 오프셋 (페이지네이션용, 기본값: 0)
+            sort: 정렬 옵션 (latest, rating_high, rating_low)
+            
+        Returns:
+            사용자가 작성한 리뷰 응답 (total_count, reviews, has_more 포함)
+            
+        Raises:
+            DatabaseError: 리뷰 조회 중 오류 발생 시
+        """
+        try:
+            # 기본 쿼리: userId로 필터링
+            query = self.reviews_collection.where("userId", "==", user_id)
+            
+            # 정렬 옵션 적용
+            if sort == "latest":
+                query = query.order_by("createdAt", direction="DESCENDING")
+            elif sort == "rating_high":
+                query = query.order_by("overallRating", direction="DESCENDING")
+            elif sort == "rating_low":
+                query = query.order_by("overallRating", direction="ASCENDING")
+            
+            # 모든 문서 조회
+            docs = await run_in_threadpool(lambda: list(query.stream()))
+            
+            # ReviewSchema로 변환
+            all_reviews = []
+            for doc in docs:
+                try:
+                    review_data = doc.to_dict()
+                    review_data["id"] = doc.id
+                    all_reviews.append(ReviewSchema(**review_data))
+                except (ValueError, TypeError, KeyError):
+                    continue  # 스키마 변환 실패 시 스킵
+            
+            # 전체 개수
+            total_count = len(all_reviews)
+            
+            # 페이지네이션 적용
+            paginated_reviews = all_reviews[offset:offset + limit]
+            has_more = offset + limit < total_count
+            
+            from app.feature.reviews.reviews_schemas import MyReviewsResponse
+            
+            return MyReviewsResponse(
+                user_id=user_id,
+                total_count=total_count,
+                reviews=paginated_reviews,
+                has_more=has_more
+            )
+            
+        except Exception as e:
+            if isinstance(e, CustomException):
+                raise e
+            raise DatabaseError(message=f"사용자 리뷰 조회 중 오류 발생: {e}")
+
+    async def get_user_review_count(self, user_id: str) -> int:
+        """
+        사용자가 작성한 총 리뷰 개수를 조회합니다.
+        
+        Args:
+            user_id: 사용자 ID
+            
+        Returns:
+            리뷰 개수
+        """
+        try:
+            query = self.reviews_collection.where("userId", "==", user_id)
+            docs = await run_in_threadpool(lambda: list(query.stream()))
+            return len(docs)
+        except Exception as e:
+            raise DatabaseError(message=f"리뷰 개수 조회 중 오류 발생: {e}")

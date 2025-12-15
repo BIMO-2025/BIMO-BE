@@ -13,6 +13,17 @@ router = APIRouter(
 )
 
 
+@router.post("/logout")
+async def logout():
+    """
+    로그아웃 엔드포인트
+    
+    서버는 Stateless(JWT) 방식을 사용하므로, 이 요청은 성공 메시지만 반환합니다.
+    **클라이언트에서 반드시 로컬 스토리지/쿠키의 Access Token을 삭제해야 합니다.**
+    """
+    return {"message": "성공적으로 로그아웃되었습니다."}
+
+
 async def _handle_social_login(
     authenticate_func,
     request: auth_schemas.SocialLoginRequest
