@@ -272,30 +272,70 @@ def _extract_recommendations(llm_response: str, section_name: str) -> List[str]:
     return []
 
 
-def convert_my_flight_to_segment(my_flight: MyFlightSchema) -> FlightSegment:
+def convert_my_flight_to_segment(my_flight: MyFlightSchema) -> List[FlightSegment]:
     """
-    MyFlightSchema를 FlightSegment로 변환합니다.
+    MyFlightSchema를 FlightSegment 리스트로 변환합니다.
+    
+    segments의 각 구간을 FlightSegment로 변환합니다.
+    직항은 1개의 segment, 경유는 2개 이상의 segment를 가집니다.
     
     Args:
-        my_flight: 사용자의 비행 기록
+        my_flight: 사용자의 비행 기록 (segments 필수)
         
     Returns:
-        FlightSegment 객체
+        FlightSegment 객체 리스트
         
     Raises:
-        ValueError: 공항 정보가 없는 경우
+        ValueError: segment 정보가 올바르지 않은 경우
     """
-    if not my_flight.departureAirport or not my_flight.arrivalAirport:
-        raise ValueError("출발지 또는 도착지 공항 정보가 필요합니다.")
+    if not my_flight.segments or len(my_flight.segments) == 0:
+        raise ValueError("segments가 필요합니다.")
+    
+    flight_segments = []
+    for segment in my_flight.segments:
+        departure_info = segment.departure
+        arrival_info = segment.arrival
+        
+        # departure 정보 추출
+        if isinstance(departure_info, dict):
+            dep_airport = departure_info.get("iata_code") or departure_info.get("iataCode")
+            dep_time_str = departure_info.get("at")
+            
+            if not dep_airport or not dep_time_str:
+                raise ValueError(f"segment의 departure 정보가 올바르지 않습니다: {departure_info}")
+            
+            if isinstance(dep_time_str, str):
+                dep_time = datetime.fromisoformat(dep_time_str.replace("Z", "+00:00"))
+            else:
+                dep_time = dep_time_str
+        else:
+            raise ValueError(f"segment의 departure 정보 형식이 올바르지 않습니다: {type(departure_info)}")
+        
+        # arrival 정보 추출
+        if isinstance(arrival_info, dict):
+            arr_airport = arrival_info.get("iata_code") or arrival_info.get("iataCode")
+            arr_time_str = arrival_info.get("at")
+            
+            if not arr_airport or not arr_time_str:
+                raise ValueError(f"segment의 arrival 정보가 올바르지 않습니다: {arrival_info}")
+            
+            if isinstance(arr_time_str, str):
+                arr_time = datetime.fromisoformat(arr_time_str.replace("Z", "+00:00"))
+            else:
+                arr_time = arr_time_str
+        else:
+            raise ValueError(f"segment의 arrival 정보 형식이 올바르지 않습니다: {type(arrival_info)}")
     
     # 비행 시간 계산
-    duration = (my_flight.arrivalTime - my_flight.departureTime).total_seconds() / 3600
+        duration = (arr_time - dep_time).total_seconds() / 3600
     
-    return FlightSegment(
-        departure_airport=my_flight.departureAirport,
-        arrival_airport=my_flight.arrivalAirport,
-        departure_time=my_flight.departureTime,
-        arrival_time=my_flight.arrivalTime,
+        flight_segments.append(FlightSegment(
+            departure_airport=dep_airport,
+            arrival_airport=arr_airport,
+            departure_time=dep_time,
+            arrival_time=arr_time,
         flight_duration_hours=duration
-    )
+        ))
+    
+    return flight_segments
 
