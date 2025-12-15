@@ -474,6 +474,7 @@ class AirlineSearchResponseItem(BaseModel):
     항공사 검색 결과 항목
     """
     operating_carrier: str = Field(..., description="운항 항공사 코드 (owner가 아닌 실제 운항 항공사)")
+    logo_symbol_url: Optional[str] = Field(None, description="항공사 로고 심볼 URL")
     has_stopover: bool = Field(..., description="경유 여부")
     flight_number: str = Field(..., description="항공편명 (첫 번째 구간의 항공편명, 예: KE123)")
     total_duration: str = Field(..., description="총 비행 시간 (예: 14H30M)")
@@ -483,6 +484,7 @@ class AirlineSearchResponseItem(BaseModel):
         json_schema_extra={
             "example": {
                 "operating_carrier": "KE",
+                "logo_symbol_url": "https://assets.duffel.com/img/airlines/for-light-background/full-color-logo/KE.svg",
                 "has_stopover": False,
                 "flight_number": "KE123",
                 "total_duration": "14H30M",
@@ -520,6 +522,7 @@ class AirlineSearchResponse(BaseModel):
                 "results": [
                     {
                         "operating_carrier": "KE",
+                        "logo_symbol_url": "https://assets.duffel.com/img/airlines/for-light-background/full-color-logo/KE.svg",
                         "has_stopover": False,
                         "flight_number": "KE123",
                         "total_duration": "14H30M",
