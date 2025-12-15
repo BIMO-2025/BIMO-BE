@@ -145,12 +145,12 @@ async def update_nickname(
 
 @router.put("/sleep-pattern", response_model=users_schemas.UpdateSleepPatternResponse)
 async def update_sleep_pattern(
-    request: users_schemas.UpdateSleepPatternRequest,
-    uid: str = Depends(get_current_user_id)
+    request: users_schemas.UpdateSleepPatternRequest
 ):
     """
     사용자의 수면 패턴을 업데이트합니다.
     
+    - **userId**: 사용자 ID
     - **sleepPatternStart**: 수면 시작 시간 (HH:MM 형식, 예: "23:00")
     - **sleepPatternEnd**: 수면 종료 시간 (HH:MM 형식, 예: "07:00")
     
@@ -163,7 +163,7 @@ async def update_sleep_pattern(
     try:
         # 서비스를 통해 수면 패턴 업데이트
         result = await UserService.update_sleep_pattern(
-            uid=uid,
+            uid=request.userId,
             sleep_start=request.sleepPatternStart,
             sleep_end=request.sleepPatternEnd
         )
@@ -202,5 +202,52 @@ async def get_sleep_pattern(
         
     except UserProfileNotFoundError:
         raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"서버 오류가 발생했습니다: {str(e)}")
+
+
+@router.put("/profile/photo", response_model=users_schemas.UpdateProfilePhotoResponse)
+async def update_profile_photo(
+    request: users_schemas.UpdateProfilePhotoRequest
+):
+    """
+    사용자의 프로필 사진을 업데이트합니다.
+    
+    - **userId**: 사용자 ID
+    - **photo_url**: 프로필 사진 URL
+    
+    Returns:
+        - **success**: 성공 여부
+        - **message**: 결과 메시지
+        - **user**: 업데이트된 사용자 정보
+    """
+    try:
+        # 서비스를 통해 프로필 사진 업데이트
+        updated_user = await UserService.update_photo_url(
+            uid=request.userId,
+            photo_url=request.photo_url
+        )
+        
+        # 응답 형식 변환
+        user_info = UserInfo(
+            uid=updated_user.uid,
+            email=updated_user.email,
+            display_name=updated_user.display_name,
+            photo_url=updated_user.photo_url,
+            provider_id=updated_user.provider_id
+        )
+        
+        return users_schemas.UpdateProfilePhotoResponse(
+            success=True,
+            message="프로필 사진이 성공적으로 업데이트되었습니다.",
+            user=user_info
+        )
+        
+    except UserProfileNotFoundError:
+        raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
+    except DatabaseError as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"서버 오류가 발생했습니다: {str(e)}")

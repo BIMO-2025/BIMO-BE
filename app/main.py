@@ -13,6 +13,7 @@ from app.feature.flights import flights_router, my_flights_router
 from app.feature.airlines import airline_router
 from app.feature.users import user_router
 from app.feature.flights.flights_router import search_router
+from app.feature.uploads import upload_router
 
 # 2. Firebase 초기화 실행
 from app.core import firebase
@@ -55,10 +56,11 @@ async def lifespan(app: FastAPI):
     app.state.duffel_client = get_duffel_client()
     print("[OK] Duffel client ready")
     
-    # Gemini 클라이언트 (lazy initialization으로 필요시 초기화됨)
-    from app.feature.llm.gemini_client import get_gemini_client
-    app.state.gemini_client = get_gemini_client()
-    print("[OK] Gemini client ready")
+    # Ollama 클라이언트 (lazy initialization으로 필요시 초기화됨)
+    from app.feature.llm.ollama_client import get_ollama_client
+    app.state.ollama_client = get_ollama_client()
+    print("[OK] Ollama client ready")
+
     
     # 2. 네트워크 모니터링 서비스
     # -------------------------
@@ -132,3 +134,4 @@ app.include_router(flights_router.router)
 app.include_router(my_flights_router.router)
 app.include_router(airline_router.router)
 app.include_router(search_router)  # POST /search/airlines
+app.include_router(upload_router.router)  # POST /uploads/images/base64

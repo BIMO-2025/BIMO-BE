@@ -1,0 +1,7 @@
+# 매뉴얼(Word/PDF) 자동 생성용 의존성
+# 프로젝트 런타임(requirements.txt)과 분리하여, 제출 문서 생성 시에만 설치합니다.
+python-docx==1.1.2
+reportlab==4.2.5
+
+
+

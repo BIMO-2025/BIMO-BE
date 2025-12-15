@@ -53,6 +53,7 @@ class UpdateNicknameResponse(BaseModel):
 
 class UpdateSleepPatternRequest(BaseModel):
     """수면 패턴 업데이트 요청 스키마"""
+    userId: str = Field(..., description="사용자 ID")
     sleepPatternStart: str = Field(
         ..., 
         description="수면 시작 시간 (HH:MM 형식)",
@@ -68,6 +69,7 @@ class UpdateSleepPatternRequest(BaseModel):
         from_attributes=True,
         json_schema_extra={
             "example": {
+                "userId": "kMnkTjxuKRy8QWjBzt8xRk6kGG2",
                 "sleepPatternStart": "23:00",
                 "sleepPatternEnd": "07:00"
             }
@@ -81,5 +83,32 @@ class UpdateSleepPatternResponse(BaseModel):
     message: str
     sleepPatternStart: str = Field(..., description="업데이트된 수면 시작 시간")
     sleepPatternEnd: str = Field(..., description="업데이트된 수면 종료 시간")
+    
+    model_config = ConfigDict(from_attributes=True)
+
+
+# --- 프로필 사진 업데이트 관련 스키마 ---
+
+class UpdateProfilePhotoRequest(BaseModel):
+    """프로필 사진 업데이트 요청 스키마"""
+    userId: str = Field(..., description="사용자 ID")
+    photo_url: str = Field(..., description="프로필 사진 URL")
+    
+    model_config = ConfigDict(
+        from_attributes=True,
+        json_schema_extra={
+            "example": {
+                "userId": "kMnkTjxuKRy8QWjBzt8xRk6kGG2",
+                "photo_url": "https://example.com/profile.jpg"
+            }
+        }
+    )
+
+
+class UpdateProfilePhotoResponse(BaseModel):
+    """프로필 사진 업데이트 응답 스키마"""
+    success: bool
+    message: str
+    user: UserInfo
     
     model_config = ConfigDict(from_attributes=True)

@@ -8,7 +8,7 @@ from datetime import datetime, timedelta, timezone
 from fastapi.concurrency import run_in_threadpool
 
 from app.core.firebase import FirebaseService
-from app.feature.llm.gemini_client import GeminiClient
+from app.feature.llm.ollama_client import OllamaClient
 from app.feature.reviews.reviews_schemas import (
     ReviewSchema,
     ReviewFilterRequest,
@@ -28,18 +28,18 @@ from app.core.exceptions.exceptions import (
 class ReviewsService:
     """리뷰 관련 비즈니스 로직을 처리하는 서비스 클래스"""
     
-    def __init__(self, firebase_service: FirebaseService, gemini_client: GeminiClient):
+    def __init__(self, firebase_service: FirebaseService, ollama_client: OllamaClient):
         """
         ReviewsService 초기화
         
         Args:
             firebase_service: Firebase 서비스 인스턴스
-            gemini_client: Gemini 클라이언트 인스턴스
+            ollama_client: Ollama 클라이언트 인스턴스
         """
         self.db = firebase_service.db
         self.reviews_collection = self.db.collection("reviews")
         self.airlines_collection = self.db.collection("airlines")
-        self.gemini_client = gemini_client
+        self.ollama_client = ollama_client
     
     async def get_reviews_by_airline(self, airline_code: str, limit: int = 10) -> List[ReviewSchema]:
         """
@@ -911,16 +911,8 @@ class ReviewsService:
             DatabaseError: 리뷰 조회 중 오류 발생 시
         """
         try:
-            # 기본 쿼리: userId로 필터링
+            # Firestore 쿼리: userId로만 필터링 (정렬 없이)
             query = self.reviews_collection.where("userId", "==", user_id)
-            
-            # 정렬 옵션 적용
-            if sort == "latest":
-                query = query.order_by("createdAt", direction="DESCENDING")
-            elif sort == "rating_high":
-                query = query.order_by("overallRating", direction="DESCENDING")
-            elif sort == "rating_low":
-                query = query.order_by("overallRating", direction="ASCENDING")
             
             # 모든 문서 조회
             docs = await run_in_threadpool(lambda: list(query.stream()))
@@ -934,6 +926,14 @@ class ReviewsService:
                     all_reviews.append(ReviewSchema(**review_data))
                 except (ValueError, TypeError, KeyError):
                     continue  # 스키마 변환 실패 시 스킵
+            
+            # Python에서 정렬 (Firestore 인덱스 불필요)
+            if sort == "latest":
+                all_reviews.sort(key=lambda x: x.createdAt, reverse=True)
+            elif sort == "rating_high":
+                all_reviews.sort(key=lambda x: x.overallRating, reverse=True)
+            elif sort == "rating_low":
+                all_reviews.sort(key=lambda x: x.overallRating)
             
             # 전체 개수
             total_count = len(all_reviews)
@@ -971,4 +971,46 @@ class ReviewsService:
             docs = await run_in_threadpool(lambda: list(query.stream()))
             return len(docs)
         except Exception as e:
+            if isinstance(e, CustomException):
+                raise e
             raise DatabaseError(message=f"리뷰 개수 조회 중 오류 발생: {e}")
+
+    async def increment_likes(self, review_id: str) -> dict:
+        """
+        리뷰의 좋아요 수를 1 증가시킵니다.
+        
+        Args:
+            review_id: 리뷰 ID
+            
+        Returns:
+            업데이트된 좋아요 수
+            
+        Raises:
+            ReviewNotFoundError: 리뷰를 찾을 수 없을 때
+            DatabaseError: 업데이트 중 오류 발생 시
+        """
+        try:
+            doc_ref = self.reviews_collection.document(review_id)
+            doc = await run_in_threadpool(doc_ref.get)
+            
+            if not doc.exists:
+                raise ReviewNotFoundError(review_id=review_id)
+            
+            review_data = doc.to_dict()
+            current_likes = review_data.get("likes", 0)
+            new_likes = current_likes + 1
+            
+            # 좋아요 수 업데이트
+            await run_in_threadpool(doc_ref.update, {"likes": new_likes})
+            
+            return {
+                "review_id": review_id,
+                "likes": new_likes
+            }
+            
+        except ReviewNotFoundError:
+            raise
+        except Exception as e:
+            if isinstance(e, CustomException):
+                raise e
+            raise DatabaseError(message=f"좋아요 업데이트 중 오류 발생: {e}")
