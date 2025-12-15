@@ -19,8 +19,8 @@ if env_path.exists():
 os.environ.setdefault("API_SECRET_KEY", "test-secret-key-for-testing-only")
 os.environ.setdefault("API_TOKEN_ALGORITHM", "HS256")
 os.environ.setdefault("API_TOKEN_EXPIRE_MINUTES", "30")
-os.environ.setdefault("OLLAMA_BASE_URL", "http://localhost:11434")
-os.environ.setdefault("OLLAMA_MODEL_NAME", "llama3.2:3b")
+os.environ.setdefault("GEMINI_API_KEY", "test-gemini-key-for-testing")
+os.environ.setdefault("GEMINI_MODEL_NAME", "gemini-2.5-flash")
 # FIREBASE_SERVICE_ACCOUNT_KEY는 .env에서 로드되거나, 없으면 기본값 사용
 os.environ.setdefault("FIREBASE_SERVICE_ACCOUNT_KEY", "./firebase_service_key.json")
 
@@ -48,9 +48,9 @@ def mock_firebase_auth():
 
 
 @pytest.fixture
-def mock_ollama_client():
-    """Ollama 클라이언트 모킹"""
-    with patch("app.feature.llm.ollama_client.get_ollama_client") as mock_client:
+def mock_gemini_client():
+    """Gemini 클라이언트 모킹"""
+    with patch("app.feature.llm.gemini_client.get_gemini_client") as mock_client:
         yield mock_client
 
 

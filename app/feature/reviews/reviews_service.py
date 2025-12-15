@@ -8,7 +8,7 @@ from datetime import datetime, timedelta, timezone
 from fastapi.concurrency import run_in_threadpool
 
 from app.core.firebase import FirebaseService
-from app.feature.llm.ollama_client import OllamaClient
+from app.feature.llm.gemini_client import GeminiClient
 from app.feature.reviews.reviews_schemas import (
     ReviewSchema,
     ReviewFilterRequest,
@@ -28,18 +28,18 @@ from app.core.exceptions.exceptions import (
 class ReviewsService:
     """리뷰 관련 비즈니스 로직을 처리하는 서비스 클래스"""
     
-    def __init__(self, firebase_service: FirebaseService, ollama_client: OllamaClient):
+    def __init__(self, firebase_service: FirebaseService, gemini_client: GeminiClient):
         """
         ReviewsService 초기화
         
         Args:
             firebase_service: Firebase 서비스 인스턴스
-            ollama_client: Ollama 클라이언트 인스턴스
+            gemini_client: Gemini 클라이언트 인스턴스
         """
         self.db = firebase_service.db
         self.reviews_collection = self.db.collection("reviews")
         self.airlines_collection = self.db.collection("airlines")
-        self.ollama_client = ollama_client
+        self.gemini_client = gemini_client
     
     async def get_reviews_by_airline(self, airline_code: str, limit: int = 10) -> List[ReviewSchema]:
         """

@@ -23,13 +23,9 @@ class Settings(BaseSettings):
     API_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
-    # LLM(Ollama) 설정 - 로컬 실행
-    OLLAMA_BASE_URL: str = "http://localhost:11434"
-    OLLAMA_MODEL_NAME: str = "llama3.2:3b"
-    
-    # 하위 호환성: Gemini 설정 (더 이상 사용하지 않음)
-    # GEMINI_API_KEY: Optional[str] = None
-    # GEMINI_MODEL_NAME: str = "gemini-1.5-flash"
+    # LLM(Gemini) 설정 - Google Generative AI
+    GEMINI_API_KEY: Optional[str] = None
+    GEMINI_MODEL_NAME: str = "gemini-2.5-flash"
 
 
     # Duffel API 설정
