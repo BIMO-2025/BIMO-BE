@@ -3,6 +3,8 @@
 경로: airlines/{airlineCode}
 """
 
+import asyncio
+import time
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional
 
@@ -12,6 +14,35 @@ from app.core.firebase import FirebaseService
 from app.feature.airlines.models import Airline, AirlineDetail
 from app.feature.flights.flights_schemas import AirlineSchema
 from app.core.exceptions.exceptions import DatabaseError, CustomException
+
+
+class _AsyncTTLCache:
+    """간단한 프로세스(인스턴스) 메모리 TTL 캐시.
+
+    - 여러 FastAPI worker/인스턴스 환경에서는 각 프로세스마다 따로 캐시됩니다.
+    - Firestore read를 줄이기 위한 'best effort' 캐시입니다.
+    """
+
+    def __init__(self, ttl_seconds: int):
+        self._ttl_seconds = ttl_seconds
+        self._expires_at: float = 0.0
+        self._value = None
+        self._lock = asyncio.Lock()
+
+    async def get(self):
+        now = time.time()
+        if self._value is not None and now < self._expires_at:
+            return self._value
+        return None
+
+    async def set(self, value):
+        async with self._lock:
+            self._value = value
+            self._expires_at = time.time() + self._ttl_seconds
+
+
+# /airlines/sorting 결과(상위 10개)를 짧게 캐싱해서 트래픽이 있을 때 Firestore read를 크게 줄입니다.
+_AIRLINES_SORTED_TOP10_CACHE = _AsyncTTLCache(ttl_seconds=60)
 
 
 class AirlineService:
@@ -350,14 +381,20 @@ class AirlineService:
     
     async def get_airlines_sorted_by_rating(self) -> List[Airline]:
         """
-        모든 항공사를 overallRating 순으로 정렬하여 반환합니다.
+        overallRating 상위 항공사(기본 10개)를 반환합니다.
         
         Returns:
-            overallRating 내림차순으로 정렬된 항공사 목록
+            overallRating 내림차순으로 정렬된 항공사 목록 (상위 10개)
         """
         try:
-            # 모든 항공사 조회
-            docs = await run_in_threadpool(lambda: list(self.airlines_collection.stream()))
+            # 트래픽이 많을 때 Firestore read를 줄이기 위해 top10 결과를 짧게 캐싱
+            cached = await _AIRLINES_SORTED_TOP10_CACHE.get()
+            if cached is not None:
+                return cached
+
+            # Firestore에서 정렬 + limit으로 필요한 문서만 조회 (요청당 read를 10으로 고정)
+            query = self.airlines_collection.order_by("overallRating", direction="DESCENDING").limit(10)
+            docs = await run_in_threadpool(lambda: list(query.stream()))
             
             all_airlines = []
             
@@ -388,13 +425,10 @@ class AirlineService:
                 )
                 all_airlines.append(airline)
             
-            # overallRating 내림차순 정렬
-            sorted_airlines = sorted(
-                all_airlines,
-                key=lambda x: x.rating,
-                reverse=True
-            )
-            
+            # 이미 Firestore에서 정렬되어 오지만, 안전하게 한 번 더 정렬 (fallback 계산 케이스 대응)
+            sorted_airlines = sorted(all_airlines, key=lambda x: x.rating, reverse=True)
+
+            await _AIRLINES_SORTED_TOP10_CACHE.set(sorted_airlines)
             return sorted_airlines
                 
         except Exception as e:

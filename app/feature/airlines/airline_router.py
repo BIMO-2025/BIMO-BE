@@ -46,9 +46,9 @@ async def get_airlines_sorted_by_rating(
     service = Depends(get_airline_service)
 ):
     """
-    모든 항공사를 overallRating 순으로 정렬하여 조회합니다.
+    overallRating 상위 10개 항공사를 조회합니다.
     
-    Firestore airlines collection에 저장된 항공사들을 overallRating 내림차순으로 정렬하여 반환합니다.
+    Firestore airlines collection에서 overallRating 내림차순 정렬 + limit(10)으로 조회하여 반환합니다.
     """
     return await service.get_airlines_sorted_by_rating()
 
