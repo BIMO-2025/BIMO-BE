@@ -15,6 +15,8 @@ from app.core.exceptions.exceptions import InvalidTokenError, CustomException
 from app.core.image_utils import convert_images_to_base64
 from app.feature.llm.gemini_client import GeminiClient
 from app.feature.reviews.reviews_service import ReviewsService
+from app.feature.reviews.review_verification import verify_review_with_boarding_pass
+from app.feature.flights.my_flights_service import MyFlightsService
 from app.feature.reviews import reviews_schemas
 
 router = APIRouter(
@@ -126,6 +128,81 @@ async def get_detailed_reviews(
         raise HTTPException(status_code=500, detail=f"서버 오류가 발생했습니다: {str(e)}")
 
 
+@router.post("/verify", response_model=reviews_schemas.ReviewVerificationResponse, status_code=200)
+async def verify_review(
+    images: List[UploadFile] = File(..., description="탑승권 이미지 파일들 (최소 1개, 최대 3개)"),
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+):
+    """
+    탑승권 이미지를 분석하여 사용자의 myFlights와 일치하는지 인증합니다.
+    
+    - **인증 필요**: Bearer Token
+    - **이미지 자동 처리**: 업로드된 이미지를 자동으로 압축 후 Base64로 변환
+    - OCR을 통해 탑승권 정보를 추출하고, 사용자의 myFlights와 비교하여 인증 결과를 반환합니다.
+    
+    **File Fields:**
+    - images: 탑승권 이미지 파일들 (최소 1개, 최대 3개, jpg/png/webp 등)
+    
+    **Response:**
+    - isVerified: true (인증 성공) 또는 false (인증 실패)
+    
+    **사용 예시 (JavaScript):**
+    ```javascript
+    const formData = new FormData();
+    formData.append('images', boardingPassImageFile);
+    
+    fetch('/reviews/verify', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer YOUR_TOKEN' },
+      body: formData
+    })
+    .then(res => res.json())
+    .then(data => {
+      console.log('인증 결과:', data.isVerified); // true 또는 false
+    });
+    ```
+    """
+    try:
+        # 토큰 검증
+        token = credentials.credentials
+        payload = decode_access_token(token)
+        user_id = payload.get("sub")
+        
+        if not user_id:
+            raise HTTPException(status_code=401, detail="유효하지 않은 토큰입니다.")
+        
+        # 이미지 파일들을 Base64로 변환 (최대 3개)
+        image_urls = []
+        if images:
+            images_to_convert = images[:3]  # 최대 3개만 처리
+            image_urls = await convert_images_to_base64(images_to_convert)
+        
+        if not image_urls:
+            raise HTTPException(status_code=400, detail="이미지 파일이 필요합니다.")
+        
+        # 탑승권 이미지로 인증 시도
+        try:
+            firebase_service = get_firebase_service()
+            my_flights_service = MyFlightsService(firebase_service)
+            verified = await verify_review_with_boarding_pass(
+                user_id=user_id,
+                image_urls=image_urls,
+                my_flights_service=my_flights_service
+            )
+        except Exception as e:
+            print(f"[Review Verification] 인증 프로세스 중 오류 발생: {e}")
+            verified = False
+        
+        return reviews_schemas.ReviewVerificationResponse(isVerified=verified)
+        
+    except HTTPException:
+        raise
+    except InvalidTokenError:
+        raise HTTPException(status_code=401, detail="유효하지 않은 토큰입니다.")
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 @router.post("", response_model=reviews_schemas.ReviewSchema, status_code=201)
 async def create_review(
     userId: str = Form(...),
@@ -208,7 +285,10 @@ async def create_review(
             images_to_convert = images[:3]  # 최대 3개만 처리
             image_urls = await convert_images_to_base64(images_to_convert)
         
-        # 2. ratings JSON 파싱
+        # 2. isVerified는 클라이언트에서 전달받은 값 사용 (별도 /verify 엔드포인트 사용 권장)
+        verified = isVerified
+        
+        # 3. ratings JSON 파싱
         try:
             ratings_dict = json.loads(ratings)
             ratings_obj = reviews_schemas.RatingsSchema(**ratings_dict)
@@ -218,7 +298,7 @@ async def create_review(
                 detail=f"ratings 필드가 올바른 JSON 형식이 아닙니다: {str(e)}"
             )
         
-        # 3. ReviewSchema 객체 생성
+        # 4. ReviewSchema 객체 생성
         review_data = reviews_schemas.ReviewSchema(
             userId=userId,
             userNickname=userNickname,
@@ -230,7 +310,7 @@ async def create_review(
             overallRating=overallRating,
             flightNumber=flightNumber,
             seatClass=seatClass,
-            isVerified=isVerified,
+            isVerified=verified,  # 인증 결과 반영
             likes=likes,
             imageUrls=image_urls
         )
@@ -248,6 +328,7 @@ async def create_review(
             airlineCode
         )
         
+        # 6. 리뷰 객체 반환
         return created_review
         
     except HTTPException:
@@ -325,6 +406,9 @@ async def update_review(
         # 최대 3개까지만 유지
         image_urls = image_urls[:3]
         
+        # 2-1. isVerified는 클라이언트에서 전달받은 값 사용 (별도 /verify 엔드포인트 사용 권장)
+        verified = isVerified
+        
         # 3. ratings JSON 파싱
         try:
             ratings_dict = json.loads(ratings)
@@ -347,7 +431,7 @@ async def update_review(
             overallRating=overallRating,
             flightNumber=flightNumber,
             seatClass=seatClass,
-            isVerified=isVerified,
+            isVerified=verified,  # 인증 결과 반영
             likes=likes,
             imageUrls=image_urls
         )

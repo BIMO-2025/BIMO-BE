@@ -198,3 +198,10 @@ class MyReviewsResponse(BaseModel):
     has_more: bool = Field(..., description="더 많은 리뷰가 있는지 여부")
     
     model_config = ConfigDict(from_attributes=True)
+
+
+class ReviewVerificationResponse(BaseModel):
+    """리뷰 인증 결과 응답 스키마"""
+    isVerified: bool = Field(..., description="인증 성공 여부 (true: 인증됨, false: 인증 실패)")
+    
+    model_config = ConfigDict(from_attributes=True)
