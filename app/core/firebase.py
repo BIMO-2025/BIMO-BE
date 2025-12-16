@@ -33,14 +33,17 @@ class FirebaseService:
             return
         
         # 1. .env 설정 확인 (Fail Fast 1)
-        if not settings.FIREBASE_SERVICE_ACCOUNT_KEY:
+        # 새 프로젝트 키를 우선 사용, 없으면 기존 키 사용
+        service_key_path = settings.FIREBASE_NEW_SERVICE_ACCOUNT_KEY or settings.FIREBASE_SERVICE_ACCOUNT_KEY
+        
+        if not service_key_path:
             raise AppConfigError(
-                "환경 변수 'FIREBASE_SERVICE_ACCOUNT_KEY'가 설정되지 않았습니다. .env 파일을 확인하세요."
+                "환경 변수 'FIREBASE_NEW_SERVICE_ACCOUNT_KEY' 또는 'FIREBASE_SERVICE_ACCOUNT_KEY'가 설정되지 않았습니다. .env 파일을 확인하세요."
             )
         
         try:
             # 2. 서비스 키 파일 유효성 검사 (Fail Fast 2)
-            cred = credentials.Certificate(settings.FIREBASE_SERVICE_ACCOUNT_KEY)
+            cred = credentials.Certificate(service_key_path)
             
             # 3. Firebase Admin SDK 초기화 (Fail Fast 3)
             # 이미 초기화된 경우 기존 앱 사용
@@ -66,7 +69,7 @@ class FirebaseService:
         except FileNotFoundError:
             # 파일 경로가 잘못된 경우
             raise AppConfigError(
-                f"Firebase 서비스 키 파일을 찾을 수 없습니다. 경로를 확인하세요: {settings.FIREBASE_SERVICE_ACCOUNT_KEY}"
+                f"Firebase 서비스 키 파일을 찾을 수 없습니다. 경로를 확인하세요: {service_key_path}"
             )
         except Exception as e:
             # 기타 알 수 없는 오류
