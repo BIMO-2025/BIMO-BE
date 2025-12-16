@@ -71,21 +71,28 @@ async def convert_image_to_base64(file: UploadFile) -> str:
         
         # 7. 크기 확인
         if len(base64_url) > MAX_BASE64_SIZE:
+            # Windows 인코딩 문제 방지를 위해 파일명을 안전하게 처리
+            safe_filename = file.filename.encode('utf-8', errors='replace').decode('utf-8') if file.filename else "unknown"
             raise HTTPException(
                 status_code=400,
-                detail=f"압축 후에도 이미지가 너무 큽니다: {file.filename}. 최대 크기: {MAX_BASE64_SIZE // 1024}KB"
+                detail=f"압축 후에도 이미지가 너무 큽니다: {safe_filename}. 최대 크기: {MAX_BASE64_SIZE // 1024}KB"
             )
         
-        print(f"✓ 이미지 처리 완료: {file.filename} → {len(base64_url) // 1024}KB (Base64)")
+        # Windows 인코딩 문제 방지를 위해 파일명을 안전하게 처리
+        safe_filename = file.filename.encode('utf-8', errors='replace').decode('utf-8') if file.filename else "unknown"
+        print(f"[OK] 이미지 처리 완료: {safe_filename} -> {len(base64_url) // 1024}KB (Base64)")
         
         return base64_url
         
     except HTTPException:
         raise
     except Exception as e:
+        # 에러 메시지에서도 파일명과 에러를 안전하게 처리
+        safe_filename = file.filename.encode('utf-8', errors='replace').decode('utf-8') if file.filename else "unknown"
+        error_msg = str(e).encode('utf-8', errors='replace').decode('utf-8')
         raise HTTPException(
             status_code=400,
-            detail=f"이미지 처리 실패 ({file.filename}): {str(e)}"
+            detail=f"이미지 처리 실패 ({safe_filename}): {error_msg}"
         )
 
 

@@ -68,44 +68,92 @@ JSON 형식으로만 응답해주세요. 다른 설명은 필요 없습니다.
   "passenger_name": "KIM MINSU"
 }"""
             
-            image_attachment = ImageAttachment(
-                mime_type="image/jpeg",
-                base64_data=base64_data
-            )
+            # Gemini API에 전달할 이미지 파트 생성 (prompt_builder._build_image_parts와 동일한 형식)
+            image_part = {
+                "mime_type": "image/jpeg",
+                "data": base64_data
+            }
+            
+            print(f"[Review Verification] Gemini API 호출 시작 (이미지 크기: {len(base64_data)} bytes)")
             
             # Gemini API 호출
             response_text = await self.gemini_client.generate(
-                prompt_segments=[image_attachment, prompt],
+                prompt_segments=[image_part, prompt],
                 system_instruction="You are an expert at extracting flight information from boarding pass images. Return only valid JSON."
             )
+            
+            print(f"[Review Verification] Gemini API 호출 완료")
+            
+            print(f"[Review Verification] Gemini 응답 (일부): {response_text[:300] if response_text else 'None'}")
             
             # JSON 파싱 시도
             extracted_info = self._parse_extracted_info(response_text)
             
+            if extracted_info:
+                print(f"[Review Verification] OCR 추출 성공: {extracted_info}")
+            else:
+                print(f"[Review Verification] OCR 추출 실패: JSON 파싱 실패 또는 필수 필드 누락")
+            
             return extracted_info
             
         except Exception as e:
-            print(f"[Review Verification] OCR 추출 실패: {e}")
-            return None
+            error_msg = f"{type(e).__name__}: {str(e)}"
+            print(f"[Review Verification] OCR 추출 실패 (예외 발생): {error_msg}")
+            import traceback
+            print(f"[Review Verification] 상세:\n{traceback.format_exc()}")
+            # 에러를 다시 raise하여 클라이언트에 전달
+            raise HTTPException(
+                status_code=500,
+                detail=f"OCR 추출 중 오류가 발생했습니다: {error_msg}"
+            )
     
     def _parse_extracted_info(self, response_text: str) -> Optional[Dict[str, Any]]:
         """
         Gemini 응답 텍스트에서 JSON을 파싱합니다.
         """
+        if not response_text:
+            print(f"[Review Verification] 응답 텍스트가 비어있음")
+            return None
+            
         try:
             # JSON 블록 찾기 (```json ... ``` 또는 {...})
-            json_match = re.search(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', response_text, re.DOTALL)
-            if json_match:
-                import json
+            # 먼저 ```json ... ``` 형식 찾기
+            json_block_match = re.search(r'```json\s*(\{.*?\})\s*```', response_text, re.DOTALL)
+            if json_block_match:
+                json_str = json_block_match.group(1)
+            else:
+                # 일반 JSON 객체 찾기
+                json_match = re.search(r'\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}', response_text, re.DOTALL)
+                if not json_match:
+                    print(f"[Review Verification] JSON 형식을 찾을 수 없음. 응답: {response_text[:500]}")
+                    return None
                 json_str = json_match.group(0)
-                data = json.loads(json_str)
-                
-                # 필수 필드 검증
-                required_fields = ["airline_code", "flight_number", "departure_airport", "arrival_airport"]
-                if all(field in data and data[field] for field in required_fields):
-                    return data
-        except Exception as e:
+            
+            print(f"[Review Verification] 추출된 JSON 문자열: {json_str[:200]}")
+            
+            import json
+            data = json.loads(json_str)
+            
+            print(f"[Review Verification] 파싱된 데이터: {data}")
+            
+            # 필수 필드 검증
+            required_fields = ["airline_code", "flight_number", "departure_airport", "arrival_airport"]
+            missing_fields = [field for field in required_fields if field not in data or not data[field]]
+            
+            if missing_fields:
+                print(f"[Review Verification] 필수 필드 누락: {missing_fields}")
+                return None
+            
+            print(f"[Review Verification] 모든 필수 필드 확인 완료")
+            return data
+            
+        except json.JSONDecodeError as e:
             print(f"[Review Verification] JSON 파싱 실패: {e}")
+            print(f"[Review Verification] 원본 응답: {response_text[:500]}")
+        except Exception as e:
+            print(f"[Review Verification] 예외 발생: {type(e).__name__}: {e}")
+            import traceback
+            print(f"[Review Verification] 상세:\n{traceback.format_exc()}")
         
         return None
 
