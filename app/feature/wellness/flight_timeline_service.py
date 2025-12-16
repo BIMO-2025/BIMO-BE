@@ -9,7 +9,9 @@ from typing import List, Dict, Any
 from app.feature.wellness.flight_timeline_schemas import (
     FlightTimelineRequest,
     FlightTimelineResponse,
-    TimelineEvent
+    TimelineEvent,
+    FlightSegmentInfo,
+    LayoverInfo
 )
 from app.feature.llm import llm_service
 from app.feature.llm.llm_schemas import LLMChatRequest
@@ -28,6 +30,23 @@ def format_display_time(start: datetime, end: datetime) -> str:
     return f"{start.strftime('%H:%M')} - {end.strftime('%H:%M')}"
 
 
+def _calculate_layover_info(segments: List[FlightSegmentInfo]) -> List[LayoverInfo]:
+    """구간 정보로부터 경유 대기 정보 계산"""
+    layovers = []
+    for i in range(len(segments) - 1):
+        current_arrival = segments[i].arrival_time
+        next_departure = segments[i + 1].departure_time
+        duration_hours = (next_departure - current_arrival).total_seconds() / 3600
+        
+        layovers.append(LayoverInfo(
+            airport=segments[i].destination,
+            duration_hours=duration_hours,
+            start_time=current_arrival,
+            end_time=next_departure
+        ))
+    return layovers
+
+
 async def generate_flight_timeline(request: FlightTimelineRequest) -> FlightTimelineResponse:
     """
     LLM을 사용하여 비행 타임라인을 생성합니다.
@@ -44,8 +63,44 @@ async def generate_flight_timeline(request: FlightTimelineRequest) -> FlightTime
         request.arrival_time
     )
     
+    # 경유 정보 처리
+    segments = request.segments
+    layovers = request.layovers
+    has_stopover = request.has_stopover
+    
+    # segments가 제공되면 layovers 자동 계산
+    if segments and len(segments) > 1:
+        has_stopover = True
+        if not layovers:
+            layovers = _calculate_layover_info(segments)
+    elif segments and len(segments) == 1:
+        has_stopover = False
+    
+    # 경유 정보 프롬프트 생성
+    segments_info = ""
+    if segments and len(segments) > 0:
+        segments_info = "\n\n**비행 구간 정보:**\n"
+        for i, seg in enumerate(segments, 1):
+            segments_info += f"""구간 {i}: {seg.origin} → {seg.destination}
+- 출발: {seg.departure_time.strftime('%Y-%m-%d %H:%M')}
+- 도착: {seg.arrival_time.strftime('%Y-%m-%d %H:%M')}
+- 비행 시간: {seg.duration}
+
+"""
+    
+    layovers_info = ""
+    if layovers and len(layovers) > 0:
+        layovers_info = "**경유 대기 정보:**\n"
+        for i, layover in enumerate(layovers, 1):
+            layovers_info += f"""경유지 {i}: {layover.airport}
+- 대기 시간: {layover.duration_hours:.1f}시간
+- {layover.start_time.strftime('%Y-%m-%d %H:%M')} ~ {layover.end_time.strftime('%Y-%m-%d %H:%M')}
+
+"""
+    
     # LLM 프롬프트 구성
-    prompt = f"""당신은 비행 경험 최적화 전문가입니다. 다음 비행 정보를 바탕으로 사용자의 목표에 맞는 최적의 타임라인을 생성해주세요.
+    prompt = f"""당신은 Harvard Medical School의 Timeshifter 연구를 기반으로 한 비행 경험 최적화 전문가입니다. 
+다음 비행 정보를 바탕으로 사용자의 목표에 맞는 최적의 타임라인을 생성해주세요.
 
 **비행 정보:**
 - 출발지: {request.origin}
@@ -55,14 +110,31 @@ async def generate_flight_timeline(request: FlightTimelineRequest) -> FlightTime
 - 총 비행 시간: {total_duration}
 - 좌석 등급: {request.seat_class}
 - 비행 목표: {request.flight_goal}
-
+{segments_info}{layovers_info}
 **비행 목표 설명:**
 - SLEEP_FOCUS: 시차 적응을 위한 수면 집중
 - WORK_FOCUS: 업무/생산성 집중
 - ENTERTAINMENT: 휴식 및 엔터테인먼트 즐기기
 
+**과학적 근거 (Timeshifter 연구):**
+1. **빛 노출 (가장 중요!)**: 생체시계(Circadian Rhythm) 조절의 핵심
+   - 동쪽 이동: 오전 빛 노출 권장 (+), 저녁 빛 차단 권장 (-)
+   - 서쪽 이동: 저녁 빛 노출 권장 (+), 오전 빛 차단 권장 (-)
+   
+2. **Phase Response Curve (PRC)**: 빛 노출 타이밍에 따라 생체시계가 앞당겨지거나 늦춰짐
+   
+3. **수면 스케줄**: 목적지 시간대에 맞춘 수면으로 시차 적응 가속화
+   
+4. **구간별 전략**: 경유지에서도 최종 목적지 시간대 기준으로 조절
+
+**경유 시간별 권장사항:**
+- 2시간 미만: 라운지 휴식, 가벼운 스트레칭
+- 2-6시간: 목적지 시간대에 따라 수면/활동 조절, 샤워 시설 활용
+- 6시간 이상: 공항 호텔 또는 수면실 이용, 본격적인 휴식
+- 24시간 이상(스톱오버): 현지 활동, 야외 햇빛 노출로 시차 적응 시작
+
 **요청사항:**
-사용자의 비행 목표({request.flight_goal})에 맞춰 타임라인을 생성하세요.
+사용자의 비행 목표({request.flight_goal})와 경유 정보를 고려하여 타임라인을 생성하세요.
 
 다음 JSON 형식으로 정확히 응답해주세요:
 
@@ -119,12 +191,19 @@ async def generate_flight_timeline(request: FlightTimelineRequest) -> FlightTime
 
 **중요 사항:**
 1. timeline_events는 반드시 배열이어야 합니다
-2. 각 이벤트는 hours_f rom_departure(출발 후 경과 시간)와 duration_hours(이벤트 지속 시간)을 포함해야 합니다
-3. 이벤트 타입(type)은 다음 중 하나여야 합니다: TAKEOFF, MEAL, SLEEP, WORK, ENTERTAINMENT, FREE_TIME, LANDING
+2. 각 이벤트는 hours_from_departure(출발 후 경과 시간)와 duration_hours(이벤트 지속 시간)을 포함해야 합니다
+3. 이벤트 타입(type)은 다음 중 하나여야 합니다: 
+   - TAKEOFF (이륙), MEAL (식사), SLEEP (수면), WORK (업무), ENTERTAINMENT (엔터테인먼트)
+   - FREE_TIME (자유 시간), LAYOVER (경유 대기), CONNECTION (환승), LANDING (착륙)
 4. 첫 이벤트는 반드시 TAKEOFF, 마지막 이벤트는 반드시 LANDING이어야 합니다
-5. 전체 이벤트 시간이 총 비행 시간({total_duration})을 초과하지 않아야 합니다
-6. SLEEP_FOCUS면 수면 시간을 길게, WORK_FOCUS면 업무/집중 시간을 포함, ENTERTAINMENT면 엔터테인먼트 시간을 포함하세요
-7. JSON 형식을 정확히 지켜주세요. 다른 텍스트 없이 JSON만 반환하세요.
+5. 경유 항공편의 경우:
+   - 각 구간별로 TAKEOFF/LANDING 대신 구간 1 비행/구간 2 비행으로 표현
+   - LAYOVER 또는 CONNECTION 이벤트를 경유 대기 시간에 맞춰 배치
+   - 경유 시간에 따라 적절한 활동 권장 (라운지, 수면, 샤워 등)
+6. 전체 이벤트 시간이 총 비행 시간({total_duration})을 초과하지 않아야 합니다
+7. SLEEP_FOCUS면 수면 시간을 길게, WORK_FOCUS면 업무/집중 시간을 포함, ENTERTAINMENT면 엔터테인먼트 시간을 포함하세요
+8. 시차 적응을 위해 빛 노출/차단 권장사항을 description에 포함하세요
+9. JSON 형식을 정확히 지켜주세요. 다른 텍스트 없이 JSON만 반환하세요.
 """
 
     system_instruction = (
