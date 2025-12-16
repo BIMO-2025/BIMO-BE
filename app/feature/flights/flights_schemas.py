@@ -442,6 +442,31 @@ class SegmentDetailSchema(BaseModel):
     )
 
 
+class SegmentHasReviewStatusSchema(BaseModel):
+    """
+    myFlights의 각 segment에 대해 '리뷰 작성 여부'만 반환하기 위한 경량 스키마
+    """
+    operating_carrier: Optional[str] = Field(None, description="운항 항공사 코드 (예: KE)")
+    flight_number: Optional[str] = Field(None, description="항공편 번호 (예: KE901)")
+    hasReview: bool = Field(False, description="해당 segment에 대한 리뷰 작성 여부")
+
+
+class MyFlightSegmentsHasReviewItemSchema(BaseModel):
+    """
+    myFlights 문서(1개)에 대한 segment별 hasReview 결과
+    """
+    id: str = Field(..., description="myFlights 문서 ID")
+    segments: List[SegmentHasReviewStatusSchema] = Field(default_factory=list, description="segment별 hasReview 목록")
+
+
+class MyFlightsSegmentsHasReviewResponse(BaseModel):
+    """
+    사용자의 myFlights에서 segment별 hasReview 결과를 반환합니다.
+    """
+    userId: str = Field(..., description="사용자 ID")
+    flights: List[MyFlightSegmentsHasReviewItemSchema] = Field(default_factory=list, description="myFlights 목록(각 문서의 segment별 hasReview 포함)")
+
+
 class AirlineSearchResponseItem(BaseModel):
     """
     항공사 검색 결과 항목

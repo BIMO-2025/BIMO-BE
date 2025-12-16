@@ -288,6 +288,72 @@ class FlightsService:
             return f"{minutes}M"
         else:
             return "0M"
+
+    @staticmethod
+    def _duration_str_to_minutes(duration_str: str) -> int:
+        """
+        "14H30M", "2H", "45M", "PT14H30M" 형태의 duration 문자열을 '분'으로 변환합니다.
+        잘못된 포맷은 0으로 처리합니다.
+        """
+        if not duration_str:
+            return 0
+
+        # ISO 8601 prefix 처리
+        s = str(duration_str).strip()
+        if s.startswith("PT"):
+            s = FlightsService._parse_iso_duration(s)
+
+        hours = 0
+        minutes = 0
+
+        try:
+            if "H" in s:
+                h_part = s.split("H")[0]
+                hours = int(h_part) if h_part else 0
+
+            if "M" in s:
+                # "H"가 있으면 "H" 뒤쪽에서 분을 추출
+                if "H" in s:
+                    m_part = s.split("H", 1)[1].split("M")[0]
+                else:
+                    m_part = s.split("M")[0]
+                minutes = int(m_part) if m_part else 0
+        except Exception:
+            return 0
+
+        return hours * 60 + minutes
+
+    @staticmethod
+    def _minutes_to_duration_str(total_minutes: int) -> str:
+        """
+        분 단위를 "14H30M", "2H", "45M" 형태로 변환합니다.
+        """
+        if not total_minutes or total_minutes <= 0:
+            return "0M"
+
+        hours = total_minutes // 60
+        minutes = total_minutes % 60
+
+        if hours > 0 and minutes > 0:
+            return f"{hours}H{minutes}M"
+        if hours > 0:
+            return f"{hours}H"
+        return f"{minutes}M"
+
+    @staticmethod
+    def _sum_segments_duration(segments: List[Dict]) -> str:
+        """
+        segments 각 구간의 duration을 합산해 "H/M" 문자열로 반환합니다.
+        """
+        if not segments:
+            return "0M"
+
+        total_minutes = 0
+        for seg in segments:
+            seg_duration = FlightsService._extract_duration(seg)
+            total_minutes += FlightsService._duration_str_to_minutes(seg_duration)
+
+        return FlightsService._minutes_to_duration_str(total_minutes)
     
     @staticmethod
     def _extract_duration(segment_or_slice: Dict) -> str:
@@ -434,8 +500,8 @@ class FlightsService:
                     # 첫 번째 segment의 항공편명 추출
                     first_flight_number = get_flight_number(first_segment, operating_carrier)
                     
-                    # 총 비행 시간 계산 (slice에서 duration 추출)
-                    total_duration = self._extract_duration(first_slice)
+                    # 총 비행 시간 계산: 경유 포함 전체를 segment duration 합으로 계산
+                    total_duration = self._sum_segments_duration(segments)
                     
                     # 각 segment 정보 추출
                     segment_details = []

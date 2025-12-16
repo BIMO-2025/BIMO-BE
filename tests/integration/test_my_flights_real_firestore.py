@@ -190,12 +190,17 @@ def cleanup_test_data(test_user_id):
     try:
         firebase_service = get_firebase_service()
         if firebase_service.is_initialized:
-            collection_ref = firebase_service.db.collection("users").document(test_user_id).collection("myFlights")
-            # 모든 문서 삭제
-            docs = collection_ref.stream()
-            for doc in docs:
+            # 1) myFlights 정리
+            myflights_ref = firebase_service.db.collection("users").document(test_user_id).collection("myFlights")
+            for doc in myflights_ref.stream():
                 doc.reference.delete()
-            print(f"[CLEANUP] 테스트 데이터 정리 완료: {test_user_id}")
+
+            # 2) reviews 정리 (userId 기준)
+            reviews_ref = firebase_service.db.collection("reviews").where("userId", "==", test_user_id)
+            for doc in reviews_ref.stream():
+                doc.reference.delete()
+
+            print(f"[CLEANUP] 테스트 데이터 정리 완료: {test_user_id} (myFlights + reviews)")
     except Exception as e:
         print(f"[CLEANUP] 정리 중 오류 발생 (무시 가능): {e}")
 
@@ -347,6 +352,57 @@ class TestMyFlightsRealFirestore:
         assert len(flights) >= 3
         assert flights[0]["departureTime"] >= flights[1]["departureTime"]
         print(f"[TEST] 목록 조회 성공: {len(flights)}개 항목")
+
+    @pytest.mark.asyncio
+    async def test_get_segments_has_review_endpoint_real_firestore(
+        self,
+        client: TestClient,
+        test_user_id: str,
+        test_access_token: str,
+        test_flight_data_with_stopover: dict
+    ):
+        """
+        /users/{user_id}/my-flights/segments/has-review 엔드포인트가
+        myFlights.segments[*].hasReview 저장값을 기준으로 segment별 hasReview를 올바르게 반환하는지 검증합니다.
+        """
+        # 1) 경유 항공편(myFlights) 생성: segments[0]=KE001(true), segments[1]=KE002(false)
+        flight_payload = test_flight_data_with_stopover.copy()
+        flight_payload["segments"] = [s.copy() for s in (test_flight_data_with_stopover.get("segments") or [])]
+        assert len(flight_payload["segments"]) == 2, "fixture가 2개 segment를 가져야 합니다"
+        flight_payload["segments"][0]["hasReview"] = True
+        flight_payload["segments"][1]["hasReview"] = False
+
+        create_response = client.post(
+            f"/users/{test_user_id}/my-flights",
+            json=flight_payload,
+            headers={"Authorization": f"Bearer {test_access_token}"}
+        )
+        assert create_response.status_code == 200, f"비행 기록 생성 실패: {create_response.text}"
+        flight_id = create_response.json()["id"]
+
+        # 2) endpoint 호출
+        resp = client.get(
+            f"/users/{test_user_id}/my-flights/segments/has-review",
+            headers={"Authorization": f"Bearer {test_access_token}"}
+        )
+        assert resp.status_code == 200, f"segment hasReview 조회 실패: {resp.text}"
+        data = resp.json()
+
+        assert data["userId"] == test_user_id
+        flights = data.get("flights") or []
+        assert len(flights) >= 1
+
+        # 생성한 flight_id 항목 찾기
+        target = next((f for f in flights if f.get("id") == flight_id), None)
+        assert target is not None, "응답에서 생성한 myFlights 문서를 찾을 수 없습니다"
+
+        segs = target.get("segments") or []
+        assert len(segs) == 2, "경유 항공편은 segment가 2개여야 합니다"
+
+        # myFlights 저장값 기준: KE001 true, KE002 false
+        seg_by_fno = {s.get("flight_number"): s for s in segs}
+        assert seg_by_fno["KE001"]["hasReview"] is True
+        assert seg_by_fno["KE002"]["hasReview"] is False
     
     @pytest.mark.asyncio
     async def test_update_my_flight_real_firestore(

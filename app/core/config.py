@@ -27,6 +27,8 @@ class Settings(BaseSettings):
     # LLM(Gemini) 설정 - Google Generative AI
     GEMINI_API_KEY: Optional[str] = None
     GEMINI_MODEL_NAME: str = "gemini-2.5-flash"
+    # LLM 요청 타임아웃 (초) - 타임라인 등 사용자 대기 API에서 응답 시간을 보장하기 위함
+    LLM_REQUEST_TIMEOUT_SECONDS: float = 20.0
 
 
     # Duffel API 설정

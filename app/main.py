@@ -131,7 +131,7 @@ app.include_router(wellness_router.router)
 app.include_router(notification_router.router)
 app.include_router(offline_router.router)
 app.include_router(flights_router.router)
-app.include_router(my_flights_router.router)
+app.include_router(my_flights_router.router)  # /users/{user_id}/my-flights (incl. /segments/has-review)
 app.include_router(airline_router.router)
 app.include_router(search_router)  # POST /search/airlines
 app.include_router(upload_router.router)  # POST /uploads/images/base64

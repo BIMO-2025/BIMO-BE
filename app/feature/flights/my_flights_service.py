@@ -3,7 +3,7 @@
 경로: users/{userId}/myFlights/{myFlightId}
 """
 
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 from datetime import datetime
 from fastapi.concurrency import run_in_threadpool
 from google.cloud.firestore_v1.base_query import FieldFilter
@@ -279,6 +279,82 @@ class MyFlightsService:
             # 에러가 발생해도 리뷰 생성/삭제는 성공한 것으로 간주
             # 로깅은 나중에 추가 가능
             return True
+
+    async def get_segments_has_review(
+        self,
+        user_id: str,
+        status: Optional[str] = None,
+        limit: int = 20
+    ) -> Dict[str, Any]:
+        """
+        사용자의 myFlights를 조회하여 각 segment별 hasReview(true/false)를 반환합니다.
+
+        - myFlights 문서에 저장된 segments[*].hasReview 값에 의존하여 그대로 반환합니다.
+          (즉, 별도의 reviews 컬렉션 조회/재계산을 하지 않습니다.)
+
+        Args:
+            user_id: 사용자 ID
+            status: 비행 상태 필터 ("scheduled" 또는 "completed")
+            limit: 조회할 최대 개수
+
+        Returns:
+            {
+              "userId": str,
+              "flights": [
+                {"id": str, "segments": [{"operating_carrier": str|None, "flight_number": str|None, "hasReview": bool}, ...]},
+                ...
+              ]
+            }
+        """
+        try:
+            # 1) 사용자의 myFlights 문서 조회
+            collection_ref = self._get_collection(user_id)
+            query = collection_ref.order_by("departureTime", direction="DESCENDING")
+            if status:
+                query = query.where(filter=FieldFilter("status", "==", status))
+            query = query.limit(limit)
+
+            my_flight_docs = await run_in_threadpool(lambda: list(query.stream()))
+
+            # 2) myFlights의 segment별 hasReview 반환(저장값 사용)
+            flights: List[Dict[str, Any]] = []
+            for doc in my_flight_docs:
+                flight_data = doc.to_dict() or {}
+                raw_segments = flight_data.get("segments") or []
+
+                segments_out: List[Dict[str, Any]] = []
+                for seg in raw_segments:
+                    seg = seg or {}
+                    operating_carrier = (
+                        seg.get("operating_carrier")
+                        or seg.get("operatingCarrier")
+                        or seg.get("carrier_code")
+                        or seg.get("carrierCode")
+                        or ""
+                    )
+                    flight_number = (
+                        seg.get("flight_number")
+                        or seg.get("flightNumber")
+                        or seg.get("number")
+                        or ""
+                    )
+                    has_review = bool(seg.get("hasReview", False))
+
+                    segments_out.append(
+                        {
+                            "operating_carrier": operating_carrier or None,
+                            "flight_number": flight_number or None,
+                            "hasReview": has_review,
+                        }
+                    )
+
+                flights.append({"id": doc.id, "segments": segments_out})
+
+            return {"userId": user_id, "flights": flights}
+        except Exception as e:
+            if isinstance(e, CustomException):
+                raise e
+            raise DatabaseError(message=f"segment hasReview 조회 중 오류 발생: {e}")
 
 
 

@@ -6,7 +6,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, Body
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
-from app.feature.flights.flights_schemas import MyFlightSchema
+from app.feature.flights.flights_schemas import MyFlightSchema, MyFlightsSegmentsHasReviewResponse
 from app.feature.flights.my_flights_service import MyFlightsService
 from app.core.security import decode_access_token
 from app.core.deps import get_firebase_service
@@ -113,6 +113,23 @@ async def get_my_flights(
     """
     flights = await service.get_flights(user_id, status, limit)
     return flights
+
+
+@router.get("/segments/has-review", response_model=MyFlightsSegmentsHasReviewResponse)
+async def get_my_flights_segments_has_review(
+    user_id: str,
+    status: Optional[str] = Query(None, description="비행 상태 필터 (scheduled/completed)"),
+    limit: int = Query(20, ge=1, le=100, description="조회할 최대 개수"),
+    current_user_id: str = Depends(get_current_user_id),
+    service: MyFlightsService = Depends(get_my_flights_service)
+):
+    """
+    사용자의 myFlights에서 **segment별 hasReview(true/false)**를 반환합니다.
+
+    - `myFlights.segments[*].hasReview` **저장값에 의존**하여 그대로 반환합니다.
+    - 응답에는 `myFlights` 문서 ID가 포함됩니다.
+    """
+    return await service.get_segments_has_review(user_id=user_id, status=status, limit=limit)
 
 
 @router.get("/{flight_id}", response_model=MyFlightSchema)
