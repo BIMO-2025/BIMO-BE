@@ -41,6 +41,13 @@ def get_reviews_service(
     )
 
 
+def get_my_flights_service(
+    firebase_service = Depends(get_firebase_service)
+) -> MyFlightsService:
+    """MyFlightsService 의존성 주입"""
+    return MyFlightsService(firebase_service=firebase_service)
+
+
 
 
 
@@ -309,7 +316,8 @@ async def create_review(
     images: List[UploadFile] = File(default=[]),
     background_tasks: BackgroundTasks = None,
     credentials: HTTPAuthorizationCredentials = Depends(security),
-    service: ReviewsService = Depends(get_reviews_service)
+    service: ReviewsService = Depends(get_reviews_service),
+    firebase_service: FirebaseService = Depends(get_firebase_service)
 ):
     """
     새로운 리뷰를 생성합니다 (multipart/form-data).
@@ -417,7 +425,18 @@ async def create_review(
             airlineCode
         )
         
-        # 6. 리뷰 객체 반환
+        # 6. myFlights의 segment hasReview 업데이트 (백그라운드)
+        if flightNumber:
+            my_flights_service = MyFlightsService(firebase_service=firebase_service)
+            background_tasks.add_task(
+                my_flights_service.update_segment_review_status,
+                userId,
+                airlineCode,
+                flightNumber,
+                True
+            )
+        
+        # 7. 리뷰 객체 반환
         return created_review
         
     except HTTPException:
@@ -564,7 +583,8 @@ async def delete_review(
     review_id: str,
     background_tasks: BackgroundTasks,
     credentials: HTTPAuthorizationCredentials = Depends(security),
-    service: ReviewsService = Depends(get_reviews_service)
+    service: ReviewsService = Depends(get_reviews_service),
+    firebase_service: FirebaseService = Depends(get_firebase_service)
 ):
     """
     리뷰를 삭제합니다.
@@ -588,9 +608,10 @@ async def delete_review(
         if not user_id:
             raise HTTPException(status_code=401, detail="유효하지 않은 토큰입니다.")
         
-        # 삭제 전 리뷰 정보 조회 (항공사 코드 확인용)
+        # 삭제 전 리뷰 정보 조회 (항공사 코드 및 항공편 번호 확인용)
         old_review = await service.get_review_by_id(review_id)
         airline_code = old_review.airlineCode
+        flight_number = old_review.flightNumber
         
         # 리뷰 삭제
         result = await service.delete_review(review_id, user_id)
@@ -605,6 +626,17 @@ async def delete_review(
             service._update_bimo_summary,
             airline_code
         )
+        
+        # myFlights의 segment hasReview 복원 (백그라운드)
+        if flight_number:
+            my_flights_service = MyFlightsService(firebase_service=firebase_service)
+            background_tasks.add_task(
+                my_flights_service.update_segment_review_status,
+                user_id,
+                airline_code,
+                flight_number,
+                False
+            )
         
         return result
     except HTTPException:

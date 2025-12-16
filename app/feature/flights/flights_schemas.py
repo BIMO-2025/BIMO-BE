@@ -420,6 +420,7 @@ class SegmentDetailSchema(BaseModel):
     duration: str = Field(..., description="구간 비행 시간 (예: PT14H30M 또는 14H30M)")
     departure: Dict = Field(..., description="출발 정보 (공항 코드, 시간 등)")
     arrival: Dict = Field(..., description="도착 정보 (공항 코드, 시간 등)")
+    hasReview: Optional[bool] = Field(default=False, description="해당 항공편에 대한 리뷰 작성 여부")
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -434,7 +435,8 @@ class SegmentDetailSchema(BaseModel):
                 "arrival": {
                     "iata_code": "JFK",
                     "at": "2025-12-30T14:30:00Z"
-                }
+                },
+                "hasReview": False
             }
         }
     )

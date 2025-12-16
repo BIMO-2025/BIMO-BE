@@ -213,6 +213,72 @@ class MyFlightsService:
                 raise e
             raise DatabaseError(message=f"리뷰 연결 중 오류 발생: {e}")
 
+    async def update_segment_review_status(
+        self,
+        user_id: str,
+        airline_code: str,
+        flight_number: Optional[str],
+        has_review: bool
+    ) -> bool:
+        """
+        특정 항공편 segment의 리뷰 작성 여부를 업데이트합니다.
+        
+        Args:
+            user_id: 사용자 ID
+            airline_code: 항공사 코드 (예: "KE")
+            flight_number: 항공편 번호 (예: "KE901", 선택사항)
+            has_review: 리뷰 작성 여부 (True: 리뷰 작성됨, False: 리뷰 없음)
+            
+        Returns:
+            업데이트 성공 여부 (매칭되는 항공편이 없어도 True 반환)
+        """
+        try:
+            # flight_number가 없으면 업데이트하지 않음
+            if not flight_number:
+                return True
+            
+            # 사용자의 모든 myFlights 조회
+            collection_ref = self._get_collection(user_id)
+            docs = await run_in_threadpool(lambda: list(collection_ref.stream()))
+            
+            # 매칭되는 segment 찾기 및 업데이트
+            updated_count = 0
+            airline_code_upper = airline_code.upper()
+            flight_number_upper = flight_number.upper()
+            
+            for doc in docs:
+                flight_data = doc.to_dict()
+                segments = flight_data.get("segments", [])
+                
+                # segments 배열에서 매칭되는 segment 찾기
+                updated = False
+                for i, segment in enumerate(segments):
+                    segment_carrier = segment.get("operating_carrier", "").upper()
+                    segment_flight = segment.get("flight_number", "").upper()
+                    
+                    # airlineCode와 flightNumber로 매칭
+                    if segment_carrier == airline_code_upper and segment_flight == flight_number_upper:
+                        segments[i]["hasReview"] = has_review
+                        updated = True
+                
+                # 매칭되는 segment가 있으면 document 업데이트
+                if updated:
+                    doc_ref = collection_ref.document(doc.id)
+                    segments_to_update = flight_data["segments"]
+                    await run_in_threadpool(
+                        doc_ref.update,
+                        {"segments": segments_to_update}
+                    )
+                    updated_count += 1
+            
+            # 매칭되는 항공편이 없어도 에러 발생하지 않음 (silent fail)
+            return True
+            
+        except Exception as e:
+            # 에러가 발생해도 리뷰 생성/삭제는 성공한 것으로 간주
+            # 로깅은 나중에 추가 가능
+            return True
+
 
 
 
