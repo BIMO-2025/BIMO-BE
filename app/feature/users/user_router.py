@@ -2,13 +2,14 @@
 사용자 관련 라우터 모듈
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Header
+from fastapi import APIRouter, Depends, HTTPException, Header, Form, File, UploadFile
 from typing import Optional
 
 from app.feature.users import users_schemas
 from app.feature.users.user_service import UserService
 from app.feature.auth.auth_schemas import UserInfo
 from app.core.security import decode_access_token
+from app.core.image_utils import convert_image_to_base64
 from app.core.exceptions.exceptions import (
     InvalidTokenError,
     UserProfileNotFoundError,
@@ -208,27 +209,49 @@ async def get_sleep_pattern(
 
 @router.put("/profile/photo", response_model=users_schemas.UpdateProfilePhotoResponse)
 async def update_profile_photo(
-    request: users_schemas.UpdateProfilePhotoRequest
+    userId: str = Form(..., description="사용자 ID"),
+    image: UploadFile = File(..., description="프로필 사진 이미지 파일")
 ):
     """
-    사용자의 프로필 사진을 업데이트합니다.
+    사용자의 프로필 사진을 업데이트합니다 (multipart/form-data).
     
-    - **userId**: 사용자 ID
-    - **photo_url**: 프로필 사진 URL
+    - **이미지 자동 처리**: 업로드된 이미지를 자동으로 압축 후 Base64로 변환하여 저장
+    
+    **Form Fields:**
+    - userId: 사용자 ID
+    
+    **File Fields:**
+    - image: 프로필 사진 이미지 파일 (jpg/png/webp 등)
     
     Returns:
         - **success**: 성공 여부
         - **message**: 결과 메시지
         - **user**: 업데이트된 사용자 정보
+    
+    **사용 예시 (JavaScript):**
+    ```javascript
+    const formData = new FormData();
+    formData.append('userId', 'user123');
+    formData.append('image', profileImageFile);
+    
+    fetch('/user/profile/photo', {
+      method: 'PUT',
+      headers: { 'Authorization': 'Bearer YOUR_TOKEN' },
+      body: formData
+    });
+    ```
     """
     try:
-        # 서비스를 통해 프로필 사진 업데이트
+        # 1. 이미지를 Base64로 변환
+        photo_url = await convert_image_to_base64(image)
+        
+        # 2. 서비스를 통해 프로필 사진 업데이트
         updated_user = await UserService.update_photo_url(
-            uid=request.userId,
-            photo_url=request.photo_url
+            uid=userId,
+            photo_url=photo_url
         )
         
-        # 응답 형식 변환
+        # 3. 응답 형식 변환
         user_info = UserInfo(
             uid=updated_user.uid,
             email=updated_user.email,
