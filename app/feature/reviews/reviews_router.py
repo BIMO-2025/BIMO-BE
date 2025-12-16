@@ -128,6 +128,95 @@ async def get_detailed_reviews(
         raise HTTPException(status_code=500, detail=f"서버 오류가 발생했습니다: {str(e)}")
 
 
+@router.post("/verify/ocr-test", status_code=200)
+async def test_ocr_extraction(
+    image: UploadFile = File(..., description="탑승권 이미지 파일 (단일 파일)"),
+):
+    """
+    OCR 기능 테스트용 엔드포인트 - 탑승권 이미지에서 추출된 정보를 반환합니다.
+    
+    - **인증 불필요**: 토큰 없이 사용 가능
+    - 이미지만 받아서 OCR로 추출된 항공편 정보를 그대로 반환합니다.
+    - 인증 매칭은 수행하지 않습니다.
+    
+    **Swagger UI 사용법:**
+    1. "Try it out" 클릭
+    2. "image" 필드에서 "Choose File" 버튼 클릭
+    3. 탑승권 이미지 파일 선택 (jpg, png, webp 등)
+    4. "Execute" 클릭
+    
+    **Response:**
+    ```json
+    {
+      "success": true,
+      "extracted_info": {
+        "airline_code": "KE",
+        "flight_number": "KE901",
+        "departure_airport": "ICN",
+        "arrival_airport": "JFK",
+        "departure_date": "2025-12-20",
+        "seat_class": "Economy",
+        "passenger_name": "KIM MINSU"
+      },
+      "error": null
+    }
+    ```
+    """
+    try:
+        if not image:
+            raise HTTPException(status_code=400, detail="이미지 파일이 필요합니다.")
+        
+        # 이미지 파일을 Base64로 변환
+        image_urls = await convert_images_to_base64([image])
+        
+        if not image_urls:
+            raise HTTPException(status_code=400, detail="이미지 처리에 실패했습니다.")
+        
+        # OCR로 항공편 정보 추출
+        from app.feature.reviews.review_verification import FlightInfoExtractor
+        
+        extractor = FlightInfoExtractor()
+        image_url = image_urls[0]
+        
+        try:
+            print(f"[OCR Test] OCR 추출 시작...")
+            extracted_info = await extractor.extract_flight_info_from_image(image_url)
+            
+            if extracted_info:
+                print(f"[OCR Test] 추출 성공: {extracted_info}")
+                return {
+                    "success": True,
+                    "extracted_info": extracted_info,
+                    "error": None
+                }
+            else:
+                print(f"[OCR Test] 추출 실패: extracted_info가 None입니다.")
+                return {
+                    "success": False,
+                    "extracted_info": None,
+                    "error": "OCR 추출 실패: 이미지에서 항공편 정보를 찾을 수 없습니다."
+                }
+        except HTTPException as e:
+            # HTTPException은 그대로 전달
+            raise
+        except Exception as e:
+            import traceback
+            error_detail = str(e)
+            print(f"[OCR Test] 예외 발생: {error_detail}")
+            print(f"[OCR Test] 상세:\n{traceback.format_exc()}")
+            
+            return {
+                "success": False,
+                "extracted_info": None,
+                "error": error_detail
+            }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
 @router.post("/verify", response_model=reviews_schemas.ReviewVerificationResponse, status_code=200)
 async def verify_review(
     images: List[UploadFile] = File(..., description="탑승권 이미지 파일들 (최소 1개, 최대 3개)"),
