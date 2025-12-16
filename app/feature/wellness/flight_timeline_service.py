@@ -165,6 +165,11 @@ async def generate_flight_timeline(request: FlightTimelineRequest) -> FlightTime
    
 4. **구간별 전략**: 경유지에서도 최종 목적지 시간대 기준으로 조절
 
+**사용자 생활패턴:**
+{f"- 평소 수면 시간: {request.user_sleep_pattern['sleep_start']} ~ {request.user_sleep_pattern['sleep_end']}" if request.user_sleep_pattern and request.user_sleep_pattern.get('sleep_start') and request.user_sleep_pattern.get('sleep_end') else "- 정보 없음 (일반적인 수면 패턴 가정)"}
+{"- 사용자의 평소 수면 패턴을 고려하여 기내 수면 시간을 조정하세요" if request.user_sleep_pattern and request.user_sleep_pattern.get('sleep_start') else ""}
+{"- 사용자가 평소 늦게 자는 편이면 비행 초반 수면을 권장하고, 일찍 자는 편이면 비행 후반 수면을 권장하세요" if request.user_sleep_pattern and request.user_sleep_pattern.get('sleep_start') else ""}
+
 **경유 시간별 권장사항:**
 - 2시간 미만: 라운지 휴식, 가벼운 스트레칭
 - 2-6시간: 목적지 시간대에 따라 수면/활동 조절, 샤워 시설 활용
