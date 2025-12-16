@@ -47,6 +47,33 @@ def _calculate_layover_info(segments: List[FlightSegmentInfo]) -> List[LayoverIn
     return layovers
 
 
+def _calculate_actual_flight_duration(segments: List[FlightSegmentInfo]) -> str:
+    """구간별 비행 시간을 합산하여 순수 비행 시간 계산 (경유 대기 시간 제외)"""
+    if not segments:
+        return "0h 0m"
+    
+    total_seconds = 0
+    for segment in segments:
+        # duration 파싱 (예: "3h 30m" -> 3.5시간)
+        duration_str = segment.duration.lower()
+        hours = 0
+        minutes = 0
+        
+        if 'h' in duration_str:
+            parts = duration_str.split('h')
+            hours = int(parts[0].strip())
+            if len(parts) > 1 and 'm' in parts[1]:
+                minutes = int(parts[1].replace('m', '').strip())
+        elif 'm' in duration_str:
+            minutes = int(duration_str.replace('m', '').strip())
+        
+        total_seconds += hours * 3600 + minutes * 60
+    
+    total_hours = int(total_seconds // 3600)
+    total_minutes = int((total_seconds % 3600) // 60)
+    return f"{total_hours}h {total_minutes}m"
+
+
 async def generate_flight_timeline(request: FlightTimelineRequest) -> FlightTimelineResponse:
     """
     LLM을 사용하여 비행 타임라인을 생성합니다.
@@ -57,8 +84,8 @@ async def generate_flight_timeline(request: FlightTimelineRequest) -> FlightTime
     Returns:
         Flight Timeline Response
     """
-    # 총 비행 시간 계산
-    total_duration = request.total_duration or calculate_duration_str(
+    # 총 소요 시간 계산 (출발~도착, 경유 대기 시간 포함)
+    total_journey_time = calculate_duration_str(
         request.departure_time, 
         request.arrival_time
     )
@@ -75,6 +102,16 @@ async def generate_flight_timeline(request: FlightTimelineRequest) -> FlightTime
             layovers = _calculate_layover_info(segments)
     elif segments and len(segments) == 1:
         has_stopover = False
+    
+    # 순수 비행 시간 계산 (경유 대기 시간 제외)
+    actual_flight_duration = None
+    if segments:
+        actual_flight_duration = _calculate_actual_flight_duration(segments)
+    
+    # total_duration: 프롬프트에 표시할 시간
+    # - segments 있으면: 순수 비행 시간
+    # - segments 없으면: 전체 여정 시간 (기존 동작)
+    total_duration = actual_flight_duration or request.total_duration or total_journey_time
     
     # 경유 정보 프롬프트 생성
     segments_info = ""
@@ -107,7 +144,8 @@ async def generate_flight_timeline(request: FlightTimelineRequest) -> FlightTime
 - 도착지: {request.destination}
 - 출발 시간: {request.departure_time.isoformat()}
 - 도착 시간: {request.arrival_time.isoformat()}
-- 총 비행 시간: {total_duration}
+- 총 소요 시간: {total_journey_time} (출발부터 도착까지)
+- 순수 비행 시간: {total_duration} (경유 대기 시간 제외)
 - 좌석 등급: {request.seat_class}
 - 비행 목표: {request.flight_goal}
 {segments_info}{layovers_info}
@@ -200,7 +238,10 @@ async def generate_flight_timeline(request: FlightTimelineRequest) -> FlightTime
    - 각 구간별로 TAKEOFF/LANDING 대신 구간 1 비행/구간 2 비행으로 표현
    - LAYOVER 또는 CONNECTION 이벤트를 경유 대기 시간에 맞춰 배치
    - 경유 시간에 따라 적절한 활동 권장 (라운지, 수면, 샤워 등)
-6. 전체 이벤트 시간이 총 비행 시간({total_duration})을 초과하지 않아야 합니다
+6. **이벤트 배치 기준:**
+   - 경유편: 순수 비행 시간({total_duration})만 고려하여 이벤트 배치
+   - 경유 대기 시간은 LAYOVER 이벤트로 별도 표현
+   - 전체 타임라인 = 비행 이벤트 + 경유 이벤트
 7. SLEEP_FOCUS면 수면 시간을 길게, WORK_FOCUS면 업무/집중 시간을 포함, ENTERTAINMENT면 엔터테인먼트 시간을 포함하세요
 8. 시차 적응을 위해 빛 노출/차단 권장사항을 description에 포함하세요
 9. JSON 형식을 정확히 지켜주세요. 다른 텍스트 없이 JSON만 반환하세요.
