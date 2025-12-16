@@ -33,6 +33,9 @@ class AirlineDetail(Airline):
     
     # 추가 정보
     description: Optional[str] = Field(None, description="항공사 설명")
+    
+    # BIMO 요약
+    bimo_summary: Optional[dict] = Field(None, description="BIMO AI 요약 (Good/Bad 포인트)")
 
 
 class Airport(BaseModel):
