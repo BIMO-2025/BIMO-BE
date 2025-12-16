@@ -180,10 +180,10 @@ class FlightMatcher:
             일치하는 MyFlightSchema 또는 None
         """
         try:
-            # 사용자의 모든 myFlights 조회
+            # 사용자의 모든 myFlights 조회 (status 필터 제거)
             flights = await self.my_flights_service.get_flights(
                 user_id=user_id,
-                status="completed",  # 완료된 항공편만 확인
+                status=None,  # status 필터 제거: scheduled와 completed 모두 조회
                 limit=50  # 최근 50개만 확인
             )
             
