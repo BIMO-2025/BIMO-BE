@@ -320,6 +320,8 @@ async def verify_review_with_boarding_pass(
     """
     리뷰에 첨부된 탑승권 이미지를 분석하여 myFlights와 일치하는지 확인합니다.
     
+    ⚠️ 현재 테스트/개발 모드: 무조건 인증 성공을 반환합니다.
+    
     Args:
         user_id: 사용자 ID
         image_urls: 리뷰에 첨부된 이미지 URL 리스트 (Base64 Data URL)
@@ -328,31 +330,47 @@ async def verify_review_with_boarding_pass(
     Returns:
         인증 성공 여부 (True: 인증됨, False: 인증 실패)
     """
-    if not image_urls:
-        return False
+    # ========================================
+    # 🚨 BYPASS MODE: 무조건 인증 통과
+    # 이 브랜치는 OCR 인증을 건너뛰고 무조건 통과시킵니다.
+    # 실제 배포 시에는 아래 원본 코드를 사용해야 합니다.
+    # ========================================
     
-    extractor = FlightInfoExtractor()
-    matcher = FlightMatcher(my_flights_service)
+    print(f"[Review Verification] ⚠️ BYPASS MODE: OCR 인증 건너뛰기 - 무조건 통과")
+    print(f"[Review Verification] 사용자 ID: {user_id}")
+    print(f"[Review Verification] 이미지 개수: {len(image_urls) if image_urls else 0}")
     
-    # 모든 이미지에서 항공편 정보 추출 시도
-    for image_url in image_urls:
-        # Base64 Data URL인지 확인
-        if not image_url.startswith("data:image"):
-            continue  # Base64 이미지가 아니면 건너뛰기
-        
-        # OCR로 항공편 정보 추출
-        extracted_info = await extractor.extract_flight_info_from_image(image_url)
-        
-        if not extracted_info:
-            continue  # 추출 실패 시 다음 이미지 시도
-        
-        # myFlights에서 일치하는 항공편 찾기
-        matching_flight = await matcher.find_matching_flight(user_id, extracted_info)
-        
-        if matching_flight:
-            print(f"[Review Verification] 인증 성공: 항공편 {extracted_info.get('flight_number')} 매칭됨")
-            return True
+    # 무조건 True 반환
+    return True
     
-    print(f"[Review Verification] 인증 실패: 일치하는 항공편을 찾을 수 없음")
-    return False
+    # ========================================
+    # 아래는 원본 OCR 인증 로직 (주석 처리됨)
+    # ========================================
+    # if not image_urls:
+    #     return False
+    # 
+    # extractor = FlightInfoExtractor()
+    # matcher = FlightMatcher(my_flights_service)
+    # 
+    # # 모든 이미지에서 항공편 정보 추출 시도
+    # for image_url in image_urls:
+    #     # Base64 Data URL인지 확인
+    #     if not image_url.startswith("data:image"):
+    #         continue  # Base64 이미지가 아니면 건너뛰기
+    #     
+    #     # OCR로 항공편 정보 추출
+    #     extracted_info = await extractor.extract_flight_info_from_image(image_url)
+    #     
+    #     if not extracted_info:
+    #         continue  # 추출 실패 시 다음 이미지 시도
+    #     
+    #     # myFlights에서 일치하는 항공편 찾기
+    #     matching_flight = await matcher.find_matching_flight(user_id, extracted_info)
+    #     
+    #     if matching_flight:
+    #         print(f"[Review Verification] 인증 성공: 항공편 {extracted_info.get('flight_number')} 매칭됨")
+    #         return True
+    # 
+    # print(f"[Review Verification] 인증 실패: 일치하는 항공편을 찾을 수 없음")
+    # return False
 
