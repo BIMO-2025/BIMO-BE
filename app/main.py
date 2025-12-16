@@ -1,6 +1,7 @@
 # app/main.py
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 # 1. 기능별 라우터 import
 from app.feature.llm import llm_router
@@ -111,17 +112,25 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# 5. 커스텀 예외 핸들러 등록
+# 5. CORS 설정 (Appetize 및 프론트엔드 연동용)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # 모든 origin 허용 (필요시 특정 도메인만 허용 가능)
+    allow_credentials=True,
+    allow_methods=["*"],  # 모든 HTTP 메소드 허용
+    allow_headers=["*"],  # 모든 헤더 허용
+)
+
+# 6. 커스텀 예외 핸들러 등록
 app.add_exception_handler(CustomException, custom_exception_handler)
 
-
-# 6. 루트 엔드포인트 (서버 동작 확인용)
+# 7. 루트 엔드포인트 (서버 동작 확인용)
 @app.get("/")
 def read_root():
     return {"Hello": "Welcome to BIMO-BE API"}
 
 
-# 5. 기능별 라우터 등록
+# 8. 기능별 라우터 등록
 
 app.include_router(auth_router.router)
 app.include_router(user_router.router)
