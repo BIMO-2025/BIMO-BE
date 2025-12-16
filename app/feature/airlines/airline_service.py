@@ -389,6 +389,7 @@ class AirlineService:
                 average_ratings=avg_ratings,
                 rating_breakdown=data.get("ratingBreakdown", {}),
                 overall_rating=overall_rating,
+                bimo_summary=data.get("bimoSummary"),  # BIMO 요약 추가
             )
             
             return airline_detail
