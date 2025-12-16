@@ -1,0 +1,197 @@
+{
+  "test_case": "경유 2회 + 수면 패턴 없음",
+  "request": {
+    "origin": "ICN",
+    "destination": "JFK",
+    "departure_time": "2025-12-25T10:00:00+00:00",
+    "arrival_time": "2025-12-26T17:00:00+00:00",
+    "seat_class": "BUSINESS",
+    "flight_goal": "WORK_FOCUS",
+    "segments": [
+      {
+        "origin": "ICN",
+        "destination": "DXB",
+        "departure_time": "2025-12-25T10:00:00+00:00",
+        "arrival_time": "2025-12-25T18:00:00+00:00",
+        "duration": "8h 0m"
+      },
+      {
+        "origin": "DXB",
+        "destination": "LHR",
+        "departure_time": "2025-12-26T01:00:00+00:00",
+        "arrival_time": "2025-12-26T08:00:00+00:00",
+        "duration": "7h 0m"
+      },
+      {
+        "origin": "LHR",
+        "destination": "JFK",
+        "departure_time": "2025-12-26T10:00:00+00:00",
+        "arrival_time": "2025-12-26T17:00:00+00:00",
+        "duration": "7h 0m"
+      }
+    ],
+    "user_sleep_pattern": null
+  },
+  "response": {
+    "flight_info": {
+      "origin": "ICN",
+      "destination": "JFK",
+      "total_duration": "22h 0m",
+      "seat_class": "BUSINESS",
+      "flight_goal": "WORK_FOCUS"
+    },
+    "recommendation_message": "BIMO가 'WORK_FOCUS'을 위한 플랜을 준비했어요. 복잡한 경유 비행을 최대한 효율적으로 활용하고 시차 적응에 도움을 줄 수 있도록 설계되었습니다. 자유롭게 수정하거나 삭제할 수 있어요.",
+    "timeline_events": [
+      {
+        "order": 1,
+        "type": "TAKEOFF",
+        "icon_type": "airplane_takeoff",
+        "title": "ICN 출발 및 기내 안정",
+        "description": "BIMO와 함께 스마트한 비행을 시작합니다. ICN 출발 시간은 10:00이지만, 현재 JFK는 전날 밤 9시입니다. 목적지 시간대에 맞춰 이른 밤이므로, 기내 조명을 최대한 어둡게 유지하여 수면 호르몬 분비를 유도하고 시차 적응을 시작하세요.",
+        "start_time": "2025-12-25T10:00:00+00:00",
+        "end_time": "2025-12-25T10:30:00+00:00",
+        "display_time": "10:00 - 10:30"
+      },
+      {
+        "order": 2,
+        "type": "WORK",
+        "icon_type": "briefcase",
+        "title": "업무 시간 (ICN-DXB)",
+        "description": "JFK 시간으로 늦은 밤에서 자정입니다. 가능한 한 조명을 낮추고 업무에 집중하세요. 업무 중에도 눈을 감거나 휴식을 취하여 빛 노출을 최소화하는 것이 좋습니다.",
+        "start_time": "2025-12-25T10:30:00+00:00",
+        "end_time": "2025-12-25T13:30:00+00:00",
+        "display_time": "10:30 - 13:30"
+      },
+      {
+        "order": 3,
+        "type": "MEAL",
+        "icon_type": "meal",
+        "title": "첫 번째 기내식",
+        "description": "첫 번째 기내식 시간입니다. JFK 시간으로는 심야이므로, 과식이나 카페인 섭취는 피하고 가볍게 드세요.",
+        "start_time": "2025-12-25T13:30:00+00:00",
+        "end_time": "2025-12-25T14:30:00+00:00",
+        "display_time": "13:30 - 14:30"
+      },
+      {
+        "order": 4,
+        "type": "SLEEP",
+        "icon_type": "moon",
+        "title": "수면 시간 (ICN-DXB)",
+        "description": "JFK 시간으로 새벽 1시 30분부터 4시 30분입니다. 아직 JFK 아침이 시작되기 전이므로, 충분한 수면을 취하여 목적지 시간에 맞춰 생체리듬을 조절하세요. 안대 사용 및 빛 완전 차단을 권장합니다.",
+        "start_time": "2025-12-25T14:30:00+00:00",
+        "end_time": "2025-12-25T17:30:00+00:00",
+        "display_time": "14:30 - 17:30"
+      },
+      {
+        "order": 5,
+        "type": "FREE_TIME",
+        "icon_type": "play",
+        "title": "DXB 착륙 준비",
+        "description": "DXB 착륙 준비 시간입니다. JFK 시간으로는 이른 아침이므로, 빛 노출을 최소화하며 휴식을 취하거나 가벼운 활동을 하세요. (Timeshifter 서쪽 이동: 오전 빛 차단)",
+        "start_time": "2025-12-25T17:30:00+00:00",
+        "end_time": "2025-12-25T18:00:00+00:00",
+        "display_time": "17:30 - 18:00"
+      },
+      {
+        "order": 6,
+        "type": "LAYOVER",
+        "icon_type": "airport",
+        "title": "DXB 경유 (7시간)",
+        "description": "JFK 시간으로 오전 5시부터 12시(정오)입니다. 라운지에서 샤워, 식사, 그리고 업무에 집중하세요. JFK 오전 시간대이므로, 이때는 밝은 빛을 *피하고* 가능하면 어두운 곳에서 휴식하는 것이 목적지 시차 적응(몸 시계를 늦추는)에 더 유리합니다. (Timeshifter 서쪽 이동: 오전 빛 차단)",
+        "start_time": "2025-12-25T18:00:00+00:00",
+        "end_time": "2025-12-26T01:00:00+00:00",
+        "display_time": "18:00 - 01:00"
+      },
+      {
+        "order": 7,
+        "type": "WORK",
+        "icon_type": "briefcase",
+        "title": "업무 시간 (DXB-LHR)",
+        "description": "JFK 시간으로 정오부터 오후 3시입니다. 밝은 환경에서 중요한 업무에 집중하세요. 이 시간대는 비교적 자유롭게 활동하며 업무에 몰두하기 좋습니다.",
+        "start_time": "2025-12-26T01:00:00+00:00",
+        "end_time": "2025-12-26T04:00:00+00:00",
+        "display_time": "01:00 - 04:00"
+      },
+      {
+        "order": 8,
+        "type": "MEAL",
+        "icon_type": "meal",
+        "title": "두 번째 기내식",
+        "description": "두 번째 기내식 시간입니다. 단백질 위주의 식사로 에너지를 보충하세요.",
+        "start_time": "2025-12-26T04:00:00+00:00",
+        "end_time": "2025-12-26T05:00:00+00:00",
+        "display_time": "04:00 - 05:00"
+      },
+      {
+        "order": 9,
+        "type": "FREE_TIME",
+        "icon_type": "play",
+        "title": "자유 시간 (DXB-LHR)",
+        "description": "가벼운 독서나 엔터테인먼트를 즐기세요. JFK 시간으로 오후 4시부터 저녁 6시 30분입니다. 이 시간대에는 밝은 조명에 노출되어 목적지 시간에 맞춰 생체시계를 늦추는 것이 좋습니다. (Timeshifter 서쪽 이동: 저녁 빛 노출)",
+        "start_time": "2025-12-26T05:00:00+00:00",
+        "end_time": "2025-12-26T07:30:00+00:00",
+        "display_time": "05:00 - 07:30"
+      },
+      {
+        "order": 10,
+        "type": "LANDING",
+        "icon_type": "airplane_landing",
+        "title": "LHR 착륙 준비",
+        "description": "LHR 착륙 준비 시간입니다. JFK 시간으로 저녁이므로, 가능한 한 빛 노출을 유지하는 것이 좋습니다. 라운지로 이동 시에도 밝은 공간을 활용하세요.",
+        "start_time": "2025-12-26T07:30:00+00:00",
+        "end_time": "2025-12-26T08:00:00+00:00",
+        "display_time": "07:30 - 08:00"
+      },
+      {
+        "order": 11,
+        "type": "LAYOVER",
+        "icon_type": "airport",
+        "title": "LHR 경유 (2시간)",
+        "description": "JFK 시간으로 저녁 7시부터 9시입니다. 짧은 경유 시간이므로 라운지에서 간단한 스트레칭, 음료를 즐기세요. 목적지 저녁 시간대이므로 밝은 조명에 노출되어 생체시계를 늦추는 데 도움을 받는 것이 중요합니다.",
+        "start_time": "2025-12-26T08:00:00+00:00",
+        "end_time": "2025-12-26T10:00:00+00:00",
+        "display_time": "08:00 - 10:00"
+      },
+      {
+        "order": 12,
+        "type": "SLEEP",
+        "icon_type": "moon",
+        "title": "수면 시간 (LHR-JFK)",
+        "description": "JFK 시간으로 밤 9시부터 새벽 1시입니다. 목적지 시간대에 맞춰 충분히 숙면을 취하여 시차 적응에 가장 중요한 시간을 보내세요. 빛 노출을 완전히 차단하고 최대한 어둡게 유지합니다.",
+        "start_time": "2025-12-26T10:00:00+00:00",
+        "end_time": "2025-12-26T14:00:00+00:00",
+        "display_time": "10:00 - 14:00"
+      },
+      {
+        "order": 13,
+        "type": "MEAL",
+        "icon_type": "meal",
+        "title": "세 번째 기내식",
+        "description": "마지막 기내식 시간입니다. JFK 시간으로 새벽 1시이므로, 가볍고 소화하기 쉬운 식사를 권장합니다. 카페인 섭취는 피하세요.",
+        "start_time": "2025-12-26T14:00:00+00:00",
+        "end_time": "2025-12-26T15:00:00+00:00",
+        "display_time": "14:00 - 15:00"
+      },
+      {
+        "order": 14,
+        "type": "WORK",
+        "icon_type": "briefcase",
+        "title": "업무 시간 및 JFK 도착 준비 (LHR-JFK)",
+        "description": "JFK 시간으로 새벽 2시부터 3시 30분입니다. 착륙이 가까워지고 있으나, 아직 JFK 아침 전이므로 기내 조명을 어둡게 유지하며 가벼운 업무를 진행하거나 도착 후 업무를 준비하세요. 빛 노출은 최소화합니다.",
+        "start_time": "2025-12-26T15:00:00+00:00",
+        "end_time": "2025-12-26T16:30:00+00:00",
+        "display_time": "15:00 - 16:30"
+      },
+      {
+        "order": 15,
+        "type": "LANDING",
+        "icon_type": "airplane_landing",
+        "title": "JFK 도착",
+        "description": "JFK에 무사히 도착했습니다! BIMO가 'WORK_FOCUS' 비행을 성공적으로 도왔습니다. 현재 JFK는 새벽 4시입니다. 목적지 시간에 맞춰 밝은 빛 노출을 최대한 피하고 필요하다면 수면을 연장하는 것이 좋습니다.",
+        "start_time": "2025-12-26T16:30:00+00:00",
+        "end_time": "2025-12-26T17:00:00+00:00",
+        "display_time": "16:30 - 17:00"
+      }
+    ]
+  }
+}

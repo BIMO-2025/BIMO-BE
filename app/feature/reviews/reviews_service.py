@@ -9,7 +9,6 @@ from fastapi.concurrency import run_in_threadpool
 from google.cloud.firestore_v1.base_query import FieldFilter
 
 from app.core.firebase import FirebaseService
-from app.feature.llm.gemini_client import GeminiClient
 from app.feature.reviews.reviews_schemas import (
     ReviewSchema,
     ReviewFilterRequest,
@@ -18,7 +17,8 @@ from app.feature.reviews.reviews_schemas import (
     BIMOSummaryResponse,
     AirlineReviewsResponse,
 )
-from app.feature.llm import llm_service
+from app.feature.reviews.review_filter_service import ReviewFilterService
+from app.feature.reviews.review_summary_service import ReviewSummaryService
 from app.core.exceptions.exceptions import (
     DatabaseError,
     ReviewNotFoundError,
@@ -29,18 +29,25 @@ from app.core.exceptions.exceptions import (
 class ReviewsService:
     """리뷰 관련 비즈니스 로직을 처리하는 서비스 클래스"""
     
-    def __init__(self, firebase_service: FirebaseService, gemini_client: GeminiClient):
+    def __init__(
+        self, 
+        firebase_service: FirebaseService,
+        filter_service: ReviewFilterService,
+        summary_service: ReviewSummaryService
+    ):
         """
         ReviewsService 초기화
         
         Args:
             firebase_service: Firebase 서비스 인스턴스
-            gemini_client: Gemini 클라이언트 인스턴스
+            filter_service: 리뷰 필터링 서비스
+            summary_service: 리뷰 요약 서비스
         """
         self.db = firebase_service.db
         self.reviews_collection = self.db.collection("reviews")
         self.airlines_collection = self.db.collection("airlines")
-        self.gemini_client = gemini_client
+        self.filter_service = filter_service
+        self.summary_service = summary_service
     
     async def get_reviews_by_airline(self, airline_code: str, limit: int = 10) -> List[ReviewSchema]:
         """
@@ -179,14 +186,7 @@ class ReviewsService:
             "Provide balanced insights highlighting both strengths and areas for improvement."
         )
         
-        from app.feature.llm.llm_schemas import LLMChatRequest
-        request = LLMChatRequest(
-            prompt=prompt,
-            system_instruction=system_instruction
-        )
-        
-        summary = await llm_service.generate_chat_completion(request)
-        return summary
+        return await self.summary_service.summarize_reviews_text(reviews, airline_name)
 
     async def get_airline_reviews_summary(
         self,
@@ -227,172 +227,11 @@ class ReviewsService:
             "review_count": len(reviews)
         }
 
-    def _parse_route(self, route: str) -> Tuple[Optional[str], Optional[str]]:
-        """
-        노선 문자열을 파싱하여 출발지와 도착지를 반환합니다.
-        
-        Args:
-            route: 노선 문자열 (예: "ICN-CDG", "인천-파리")
-            
-        Returns:
-            (출발지 코드, 도착지 코드) 튜플
-        """
-        if not route:
-            return None, None
-        
-        # "-" 또는 " - "로 분리
-        parts = route.replace(" ", "").split("-")
-        if len(parts) >= 2:
-            return parts[0].upper(), parts[1].upper()
-        return None, None
 
-    def _matches_route_filter(self, review: ReviewSchema, departure: Optional[str], arrival: Optional[str]) -> bool:
-        """리뷰가 노선 필터 조건에 맞는지 확인"""
-        if not departure and not arrival:
-            return True
-        
-        review_dep, review_arr = self._parse_route(review.route)
-        
-        if departure and review_dep != departure.upper():
-            return False
-        if arrival and review_arr != arrival.upper():
-            return False
-        
-        return True
 
-    def _matches_seat_class_filter(self, review: ReviewSchema, seat_class: Optional[str]) -> bool:
-        """리뷰가 좌석 등급 필터 조건에 맞는지 확인"""
-        if not seat_class or seat_class == "전체":
-            return True
-        
-        if not review.seatClass:
-            return False
-        
-        # 좌석 등급 매칭 (대소문자 무시)
-        return review.seatClass.lower() == seat_class.lower()
 
-    async def generate_bimo_summary(self, airline_code: str) -> BIMOSummaryResponse:
-        """
-        LLM을 사용해 Good/Bad 포인트를 JSON 형태로 추출합니다.
-        실패 시 빈 리스트를 반환하여 프런트가 우회 표시 가능.
-        """
-        # 최근 리뷰 최대 50개 사용
-        reviews = await self.get_reviews_by_airline(airline_code, limit=50)
-        if not reviews:
-            return BIMOSummaryResponse(
-                airline_code=airline_code,
-                airline_name=airline_code,
-                good_points=[],
-                bad_points=[],
-                review_count=0,
-            )
 
-        airline_name = reviews[0].airlineName if getattr(reviews[0], "airlineName", None) else airline_code
 
-        review_lines = []
-        for r in reviews:
-            text = r.text or ""
-            review_lines.append(f"- {text} (평점: {r.overallRating}/5)")
-
-        prompt = f"""
-다음은 {airline_name} 항공사에 대한 리뷰 {len(reviews)}개의 목록입니다.
-각 리뷰는 텍스트와 평점을 포함합니다.
-
-리뷰 목록:
-{chr(10).join(review_lines[:50])}
-
-요구사항:
-- 한국어로 응답합니다.
-- JSON 문자열만 반환합니다 (설명 금지).
-- 형태: {{"good_points": ["..."], "bad_points": ["..."]}}
-- good/bad 각각 최대 5개, 짧고 핵심만.
-"""
-
-        system_instruction = (
-            "You are an airline review analyst. Return concise JSON with good_points and bad_points in Korean."
-        )
-
-        from app.feature.llm.llm_schemas import LLMChatRequest
-        request = LLMChatRequest(prompt=prompt, system_instruction=system_instruction)
-
-        raw = await llm_service.generate_chat_completion(request)
-
-        def _safe_parse(raw_text: str) -> tuple[list[str], list[str]]:
-            try:
-                # 원본 텍스트 정제
-                text = raw_text.strip()
-                
-                # 마크다운 코드 블록 제거
-                if "```json" in text:
-                    text = text.split("```json")[1].split("```")[0].strip()
-                elif "```" in text:
-                    text = text.split("```")[1].split("```")[0].strip()
-                
-                # JSON 파싱
-                data = json.loads(text)
-                good = data.get("good_points") or []
-                bad = data.get("bad_points") or []
-                
-                print(f"✓ JSON 파싱 성공: Good {len(good)}개, Bad {len(bad)}개")
-                return list(good), list(bad)
-            except Exception as e:
-                # 에러 로깅
-                print(f"✗ JSON 파싱 실패: {e}")
-                print(f"원본 응늵 (처음 500자): {raw_text[:500]}")
-                return [], []
-
-        good_points, bad_points = _safe_parse(raw)
-
-        return BIMOSummaryResponse(
-            airline_code=airline_code,
-            airline_name=airline_name,
-            good_points=good_points,
-            bad_points=bad_points,
-            review_count=len(reviews),
-        )
-
-    def _matches_period_filter(self, review: ReviewSchema, period: Optional[str]) -> bool:
-        """리뷰가 기간 필터 조건에 맞는지 확인"""
-        if not period or period == "전체":
-            return True
-        
-        now = datetime.now(timezone.utc)
-        review_date = review.createdAt
-        
-        if isinstance(review_date, str):
-            try:
-                review_date = datetime.fromisoformat(review_date.replace('Z', '+00:00'))
-            except (ValueError, AttributeError):
-                return True  # 파싱 실패 시 포함
-        
-        delta_map = {
-            "최근 3개월": timedelta(days=90),
-            "최근 6개월": timedelta(days=180),
-            "최근 1년": timedelta(days=365),
-        }
-        
-        delta = delta_map.get(period)
-        if not delta:
-            return True
-        
-        return (now - review_date) <= delta
-
-    def _matches_rating_filter(self, review: ReviewSchema, min_rating: Optional[int]) -> bool:
-        """리뷰가 평점 필터 조건에 맞는지 확인"""
-        if min_rating is None:
-            return True
-        
-        return review.overallRating >= min_rating
-
-    def _matches_photo_filter(self, review: ReviewSchema, photo_only: bool) -> bool:
-        """리뷰가 사진 필터 조건에 맞는지 확인"""
-        if not photo_only:
-            return True
-
-        # imageUrls(복수) 기준으로 판단 (구버전 imageUrl은 스키마에서 imageUrls로 정규화됨)
-        return bool(getattr(review, "imageUrls", None)) and any(
-            isinstance(u, str) and u.strip() for u in (review.imageUrls or [])
-        )
 
     async def get_filtered_reviews(
         self,
@@ -442,41 +281,19 @@ class ReviewsService:
                 except (ValueError, TypeError, KeyError) as e:
                     continue  # 스키마 변환 실패 시 스킵
             
-            # 4. 필터링 적용
-            filtered_reviews = []
-            for review in all_reviews:
-                if not self._matches_route_filter(review, filter_request.departure_airport, filter_request.arrival_airport):
-                    continue
-                if not self._matches_seat_class_filter(review, filter_request.seat_class):
-                    continue
-                if not self._matches_period_filter(review, filter_request.period):
-                    continue
-                if not self._matches_rating_filter(review, filter_request.min_rating):
-                    continue
-                if not self._matches_photo_filter(review, filter_request.photo_only):
-                    continue
-                
-                filtered_reviews.append(review)
+            # 4. 필터링 적용 (ReviewFilterService 위임)
+            filtered_reviews = self.filter_service.filter_reviews(all_reviews, filter_request)
             
-            # 5. 정렬 적용
-            if sort == "latest":
-                filtered_reviews.sort(key=lambda x: x.createdAt, reverse=True)
-            elif sort == "recommended" or sort == "likes_high":
-                filtered_reviews.sort(key=lambda x: x.likes, reverse=True)
-            elif sort == "rating_high":
-                filtered_reviews.sort(key=lambda x: x.overallRating, reverse=True)
-            elif sort == "rating_low":
-                filtered_reviews.sort(key=lambda x: x.overallRating)
+            # 5. 정렬 적용 (ReviewFilterService 위임)
+            filtered_reviews = self.filter_service.sort_reviews(filtered_reviews, sort)
             
-            # 6. 페이지네이션 적용
-            total_count = len(filtered_reviews)
-            paginated_reviews = filtered_reviews[offset:offset + limit]
-            has_more = offset + limit < total_count
+            # 6. 페이지네이션 적용 (ReviewFilterService 위임)
+            paginated_reviews, has_more = self.filter_service.paginate_reviews(filtered_reviews, limit, offset)
             
             return FilteredReviewsResponse(
                 airline_code=airline_code,
                 airline_name=airline_name,
-                total_count=total_count,
+                total_count=len(filtered_reviews),
                 reviews=paginated_reviews,
                 has_more=has_more
             )
@@ -539,20 +356,11 @@ class ReviewsService:
                 except (ValueError, TypeError, KeyError):
                     continue  # 스키마 변환 실패 시 스킵
             
-            # 5. 정렬 적용
-            if sort == "latest":
-                all_reviews.sort(key=lambda x: x.createdAt, reverse=True)
-            elif sort == "recommended":
-                all_reviews.sort(key=lambda x: x.likes, reverse=True)
-            elif sort == "rating_high":
-                all_reviews.sort(key=lambda x: x.overallRating, reverse=True)
-            elif sort == "rating_low":
-                all_reviews.sort(key=lambda x: x.overallRating)
+            # 5. 정렬 적용 (ReviewFilterService 위임)
+            sorted_reviews = self.filter_service.sort_reviews(all_reviews, sort)
             
-            # 6. 페이지네이션 적용
-            total_reviews = len(all_reviews)
-            paginated_reviews = all_reviews[offset:offset + limit]
-            has_more = offset + limit < total_reviews
+            # 6. 페이지네이션 적용 (ReviewFilterService 위임)
+            paginated_reviews, has_more = self.filter_service.paginate_reviews(sorted_reviews, limit, offset)
             
             return AirlineReviewsResponse(
                 airline_code=airline_code,

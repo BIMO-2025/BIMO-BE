@@ -26,6 +26,10 @@ if TYPE_CHECKING:
 from app.core.firebase import FirebaseService
 from app.core.clients.duffel import DuffelClient
 from app.feature.llm.gemini_client import GeminiClient
+from app.feature.llm.llm_service import LLMService
+from app.feature.wellness.wellness_service import WellnessService
+from app.feature.reviews.review_filter_service import ReviewFilterService
+from app.feature.reviews.review_summary_service import ReviewSummaryService
 
 
 # =============================================================================
@@ -72,6 +76,47 @@ def get_gemini_client() -> GeminiClient:
     """
     from app.feature.llm.gemini_client import get_gemini_client as _get_gemini
     return _get_gemini()
+
+
+# =============================================================================
+# LLM 서비스 의존성
+# =============================================================================
+
+def get_llm_service() -> "LLMService":
+    """
+    LLM 서비스 반환
+    
+    Returns:
+        LLMService 인스턴스
+    """
+    gemini_client = get_gemini_client()
+    return LLMService(gemini_client=gemini_client)
+
+
+def get_wellness_service() -> "WellnessService":
+    """
+    Wellness 서비스 반환
+    
+    Returns:
+        WellnessService 인스턴스
+    """
+    llm_service = get_llm_service()
+    return WellnessService(llm_service=llm_service)
+
+
+def get_review_filter_service() -> "ReviewFilterService":
+    """
+    ReviewFilterService 반환
+    """
+    return ReviewFilterService()
+
+
+def get_review_summary_service() -> "ReviewSummaryService":
+    """
+    ReviewSummaryService 반환
+    """
+    llm_service = get_llm_service()
+    return ReviewSummaryService(llm_service=llm_service)
 
 
 # =============================================================================

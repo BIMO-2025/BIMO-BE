@@ -1,0 +1,30 @@
+services:
+  - type: web
+    name: bimo-backend
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: API_SECRET_KEY
+        sync: false  # Render 대시보드에서 설정 필요
+      - key: FIREBASE_SERVICE_ACCOUNT_KEY
+        sync: false  # Firebase 서비스 계정 키 JSON 내용 (전체 JSON 문자열)
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: DUFFEL_API_KEY
+        sync: false
+      - key: GOOGLE_IOS_CLIENT_ID
+        sync: false
+      - key: GEMINI_MODEL_NAME
+        value: gemini-2.5-flash
+      - key: DUFFEL_ENVIRONMENT
+        value: test
+      - key: API_TOKEN_ALGORITHM
+        value: HS256
+      - key: API_TOKEN_EXPIRE_MINUTES
+        value: 30
+      - key: REFRESH_TOKEN_EXPIRE_DAYS
+        value: 7
+

@@ -82,6 +82,7 @@ class FlightTimelineRequest(BaseModel):
     segments: Optional[List[FlightSegmentInfo]] = Field(None, description="비행 구간 목록 (경유편의 경우)")
     layovers: Optional[List[LayoverInfo]] = Field(None, description="경유 대기 정보 (자동 계산되거나 직접 제공)")
     has_stopover: Optional[bool] = Field(None, description="경유 여부 (segments로부터 자동 판단)")
+    user_sleep_pattern: Optional[dict] = Field(None, description="사용자 수면 패턴 {sleep_start: 'HH:MM', sleep_end: 'HH:MM'}")
     
     model_config = ConfigDict(
         from_attributes=True,

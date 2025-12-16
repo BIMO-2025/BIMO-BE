@@ -111,7 +111,29 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# 5. 커스텀 예외 핸들러 등록
+# 5. CORS 미들웨어 추가 (Render/Appetize 배포 시 필수)
+from fastapi.middleware.cors import CORSMiddleware
+import os
+
+# 환경 변수에서 허용할 origin 목록 가져오기 (쉼표로 구분)
+allowed_origins_str = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:8000")
+allowed_origins = [origin.strip() for origin in allowed_origins_str.split(",")]
+
+# Appetize 도메인 추가
+allowed_origins.extend([
+    "https://appetize.io",
+    "https://*.appetize.io",
+])
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=allowed_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# 6. 커스텀 예외 핸들러 등록
 app.add_exception_handler(CustomException, custom_exception_handler)
 
 

@@ -8,6 +8,7 @@ from fastapi.concurrency import run_in_threadpool
 
 from app.core.firebase import FirebaseService
 from app.core.exceptions.exceptions import ExternalApiError
+from app.shared.datetime_utils import parse_iso_duration, parse_duration_seconds
 
 # 로거 설정
 logger = logging.getLogger(__name__)
@@ -231,18 +232,7 @@ class FlightsService:
         Returns:
             "14H30M" 형식의 문자열
         """
-        if not seconds:
-            return "0M"
-        
-        hours = seconds // 3600
-        minutes = (seconds % 3600) // 60
-        
-        if hours > 0 and minutes > 0:
-            return f"{hours}H{minutes}M"
-        elif hours > 0:
-            return f"{hours}H"
-        else:
-            return f"{minutes}M"
+        return parse_duration_seconds(seconds)
     
     @staticmethod
     def _parse_iso_duration(iso_duration: str) -> str:
@@ -255,39 +245,7 @@ class FlightsService:
         Returns:
             "14H30M" 형식의 문자열
         """
-        if not iso_duration:
-            return "0M"
-        
-        # "PT" prefix 제거
-        duration_str = iso_duration.replace("PT", "")
-        
-        hours = 0
-        minutes = 0
-        
-        # 시간 추출
-        if "H" in duration_str:
-            hours_part = duration_str.split("H")[0]
-            try:
-                hours = int(hours_part)
-            except ValueError:
-                pass
-        
-        # 분 추출
-        if "M" in duration_str:
-            minutes_part = duration_str.split("H")[-1].split("M")[0] if "H" in duration_str else duration_str.split("M")[0]
-            try:
-                minutes = int(minutes_part)
-            except ValueError:
-                pass
-        
-        if hours > 0 and minutes > 0:
-            return f"{hours}H{minutes}M"
-        elif hours > 0:
-            return f"{hours}H"
-        elif minutes > 0:
-            return f"{minutes}M"
-        else:
-            return "0M"
+        return parse_iso_duration(iso_duration)
     
     @staticmethod
     def _extract_duration(segment_or_slice: Dict) -> str:

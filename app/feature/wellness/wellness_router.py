@@ -5,9 +5,11 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
-from app.feature.wellness import flight_timeline_schemas, flight_timeline_service
+from app.feature.wellness import flight_timeline_schemas
+from app.feature.wellness.wellness_service import WellnessService
 from app.feature.flights.my_flights_service import MyFlightsService
-from app.core.deps import get_firebase_service
+from app.feature.users.user_service import UserService
+from app.core.deps import get_firebase_service, get_wellness_service
 from app.core.firebase import FirebaseService
 from app.core.security import verify_firebase_token
 
@@ -27,28 +29,7 @@ def get_my_flights_service(
     return MyFlightsService(firebase_service=firebase_service)
 
 
-@router.post("/flight-timeline", response_model=flight_timeline_schemas.FlightTimelineResponse)
-async def generate_flight_timeline(request: flight_timeline_schemas.FlightTimelineRequest):
-    """
-    LLM을 사용하여 비행 타임라인을 생성합니다.
-    
-    사용자의 비행 정보(출발지, 도착지, 출발/도착 시간)와 비행 목표를 기반으로
-    최적의 기내 활동 타임라인을 생성합니다.
-    
-    - **origin**: 출발 공항 코드 (예: DXB)
-    - **destination**: 도착 공항 코드 (예: ICN)
-    - **departure_time**: 출발 시간 (ISO 8601 형식)
-    - **arrival_time**: 도착 시간 (ISO 8601 형식)
-    - **seat_class**: 좌석 등급 (ECONOMY, BUSINESS, FIRST 등)
-    - **flight_goal**: 비행 목표 (SLEEP_FOCUS, WORK_FOCUS, ENTERTAINMENT 등)
-    - **total_duration**: 총 비행 시간 (선택사항, 예: "9h 30m")
-    
-    Returns:
-        - **flight_info**: 비행 정보 요약
-        - **recommendation_message**: 사용자에게 보여줄 추천 메시지
-        - **timeline_events**: 타임라인 이벤트 목록 (이륙, 식사, 수면, 자유시간, 착륙 등)
-    """
-    return await flight_timeline_service.generate_flight_timeline(request)
+
 
 
 
@@ -60,7 +41,8 @@ async def generate_flight_timeline_from_my_flight(
     flight_goal: str = Query(..., description="비행 목표 (SLEEP_FOCUS, WORK_FOCUS, ENTERTAINMENT)"),
     seat_class: str = Query("ECONOMY", description="좌석 등급"),
     credentials: HTTPAuthorizationCredentials = Depends(security),
-    my_flights_service: MyFlightsService = Depends(get_my_flights_service)
+    my_flights_service: MyFlightsService = Depends(get_my_flights_service),
+    wellness_service: WellnessService = Depends(get_wellness_service)
 ):
     """
     myFlights에 저장된 비행 정보를 기반으로 비행 타임라인을 생성합니다.
@@ -94,16 +76,67 @@ async def generate_flight_timeline_from_my_flight(
             detail="비행 기록을 찾을 수 없습니다."
         )
         
+    # 사용자 수면 패턴 조회
+    user_sleep_pattern = None
+    try:
+        sleep_pattern_data = await UserService.get_sleep_pattern(uid=user_id)
+        if sleep_pattern_data and sleep_pattern_data.get("sleepPatternStart") and sleep_pattern_data.get("sleepPatternEnd"):
+            user_sleep_pattern = {
+                "sleep_start": sleep_pattern_data["sleepPatternStart"],
+                "sleep_end": sleep_pattern_data["sleepPatternEnd"]
+            }
+    except Exception as e:
+        # 수면 패턴 조회 실패 시 무시하고 계속 진행
+        pass
+    
+    # segments를 FlightSegmentInfo로 변환
+    flight_segments = None
+    if my_flight.segments and len(my_flight.segments) > 0:
+        flight_segments = []
+        for seg in my_flight.segments:
+            # departure와 arrival에서 시간 추출
+            dep_dict = seg.departure if isinstance(seg.departure, dict) else {}
+            arr_dict = seg.arrival if isinstance(seg.arrival, dict) else {}
+            
+            dep_time_str = dep_dict.get("at")
+            arr_time_str = arr_dict.get("at")
+            
+            # 시간 파싱
+            from datetime import datetime
+            if dep_time_str and arr_time_str:
+                if isinstance(dep_time_str, str):
+                    dep_time = datetime.fromisoformat(dep_time_str.replace("Z", "+00:00"))
+                else:
+                    dep_time = dep_time_str
+                    
+                if isinstance(arr_time_str, str):
+                    arr_time = datetime.fromisoformat(arr_time_str.replace("Z", "+00:00"))
+                else:
+                    arr_time = arr_time_str
+                
+                flight_segments.append(
+                    flight_timeline_schemas.FlightSegmentInfo(
+                        origin=dep_dict.get("iata_code") or dep_dict.get("iataCode", ""),
+                        destination=arr_dict.get("iata_code") or arr_dict.get("iataCode", ""),
+                        departure_time=dep_time,
+                        arrival_time=arr_time,
+                        duration=seg.duration or "0h 0m"
+                    )
+                )
+    
     # FlightTimelineRequest 생성
-    # MyFlightSchema의 최상위 필드 사용
     request = flight_timeline_schemas.FlightTimelineRequest(
         origin=my_flight.departureAirport or "Unknown",
         destination=my_flight.arrivalAirport or "Unknown",
         departure_time=my_flight.departureTime,
         arrival_time=my_flight.arrivalTime,
         seat_class=seat_class,
-        flight_goal=flight_goal
+        flight_goal=flight_goal,
+        segments=flight_segments if flight_segments else None,
+        has_stopover=my_flight.hasStopover,
+        user_sleep_pattern=user_sleep_pattern  # 사용자 수면 패턴 추가
     )
     
     # 타임라인 생성 서비스 호출
-    return await flight_timeline_service.generate_flight_timeline(request)
+    return await wellness_service.generate_flight_timeline(request)
+

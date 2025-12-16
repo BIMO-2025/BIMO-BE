@@ -8,13 +8,14 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from typing import Optional, Annotated, List
 import json
 
-from app.core.deps import get_firebase_service, get_gemini_client
+from app.core.deps import get_firebase_service, get_review_filter_service, get_review_summary_service
 from app.core.firebase import FirebaseService
 from app.core.security import decode_access_token
 from app.core.exceptions.exceptions import InvalidTokenError, CustomException
 from app.core.image_utils import convert_images_to_base64
-from app.feature.llm.gemini_client import GeminiClient
 from app.feature.reviews.reviews_service import ReviewsService
+from app.feature.reviews.review_filter_service import ReviewFilterService
+from app.feature.reviews.review_summary_service import ReviewSummaryService
 from app.feature.reviews.review_verification import verify_review_with_boarding_pass
 from app.feature.flights.my_flights_service import MyFlightsService
 from app.feature.reviews import reviews_schemas
@@ -30,14 +31,16 @@ security = HTTPBearer()
 
 def get_reviews_service(
     firebase_service = Depends(get_firebase_service),
-    gemini_client = Depends(get_gemini_client)
+    filter_service: ReviewFilterService = Depends(get_review_filter_service),
+    summary_service: ReviewSummaryService = Depends(get_review_summary_service)
 ) -> ReviewsService:
     """
     ReviewsService 인스턴스를 생성합니다.
     """
     return ReviewsService(
         firebase_service=firebase_service,
-        gemini_client=gemini_client
+        filter_service=filter_service,
+        summary_service=summary_service
     )
 
 

@@ -1,0 +1,143 @@
+{
+  "test_case": "경유 1회 + 수면 패턴",
+  "request": {
+    "origin": "ICN",
+    "destination": "JFK",
+    "departure_time": "2025-12-25T22:00:00+00:00",
+    "arrival_time": "2025-12-26T14:30:00+00:00",
+    "seat_class": "ECONOMY",
+    "flight_goal": "SLEEP_FOCUS",
+    "segments": [
+      {
+        "origin": "ICN",
+        "destination": "NRT",
+        "departure_time": "2025-12-25T22:00:00+00:00",
+        "arrival_time": "2025-12-26T01:30:00+00:00",
+        "duration": "3h 30m"
+      },
+      {
+        "origin": "NRT",
+        "destination": "JFK",
+        "departure_time": "2025-12-26T03:30:00+00:00",
+        "arrival_time": "2025-12-26T14:30:00+00:00",
+        "duration": "11h 0m"
+      }
+    ],
+    "user_sleep_pattern": {
+      "sleep_start": "23:30",
+      "sleep_end": "07:00"
+    }
+  },
+  "response": {
+    "flight_info": {
+      "origin": "ICN",
+      "destination": "JFK",
+      "total_duration": "14h 30m",
+      "seat_class": "ECONOMY",
+      "flight_goal": "SLEEP_FOCUS"
+    },
+    "recommendation_message": "BIMO가 'SLEEP_FOCUS'을 위한 플랜을 준비했어요. 자유롭게 수정하거나 삭제할 수 있어요.",
+    "timeline_events": [
+      {
+        "order": 1,
+        "type": "TAKEOFF",
+        "icon_type": "airplane_takeoff",
+        "title": "구간 1: 이륙 및 안정 (ICN → NRT)",
+        "description": "BIMO와 함께 스마트한 비행을 시작합니다. 목적지 시간(JFK)은 오전 9시입니다. 시차 적응을 위해 밝은 빛에 적극적으로 노출하고 활동을 유지하세요.",
+        "start_time": "2025-12-25T22:00:00+00:00",
+        "end_time": "2025-12-25T22:30:00+00:00",
+        "display_time": "22:00 - 22:30"
+      },
+      {
+        "order": 2,
+        "type": "MEAL",
+        "icon_type": "meal",
+        "title": "구간 1: 예상 식사 시간",
+        "description": "첫 번째 기내식이 제공됩니다. 목적지 시간(JFK)은 오전입니다. 식사하며 활동을 유지하고, 빛 노출을 지속하세요.",
+        "start_time": "2025-12-25T22:30:00+00:00",
+        "end_time": "2025-12-25T23:30:00+00:00",
+        "display_time": "22:30 - 23:30"
+      },
+      {
+        "order": 3,
+        "type": "FREE_TIME",
+        "icon_type": "play",
+        "title": "구간 1: 자유 시간",
+        "description": "가벼운 활동 또는 휴식 시간입니다. 목적지 시간(JFK)은 오후 12시 30분입니다. 최대한 활동하며 밝은 빛에 노출을 유지하는 것이 시차 적응에 유리합니다.",
+        "start_time": "2025-12-25T23:30:00+00:00",
+        "end_time": "2025-12-26T01:30:00+00:00",
+        "display_time": "23:30 - 01:30"
+      },
+      {
+        "order": 4,
+        "type": "LAYOVER",
+        "icon_type": "connection",
+        "title": "경유 대기 (NRT)",
+        "description": "경유지 NRT에서 2시간 대기합니다. 목적지 시간(JFK)은 점심시간에서 오후 시간입니다 (12:30~14:30). 라운지에서 가볍게 활동하며 스트레칭을 해주세요. 가능한 한 밝은 빛에 노출을 유지하고, 시차 적응을 위해 카페인 섭취는 자제하세요.",
+        "start_time": "2025-12-26T01:30:00+00:00",
+        "end_time": "2025-12-26T03:30:00+00:00",
+        "display_time": "01:30 - 03:30"
+      },
+      {
+        "order": 5,
+        "type": "TAKEOFF",
+        "icon_type": "airplane_takeoff",
+        "title": "구간 2: 이륙 및 안정 (NRT → JFK)",
+        "description": "두 번째 이륙 후 안정. 목적지 시간(JFK)은 오후 2시 30분입니다. 사용자의 평소 늦게 자는 패턴을 고려하여 이 구간 초반에 충분한 수면을 유도합니다. 기내를 어둡게 하고 수면 준비를 시작하세요.",
+        "start_time": "2025-12-26T03:30:00+00:00",
+        "end_time": "2025-12-26T04:00:00+00:00",
+        "display_time": "03:30 - 04:00"
+      },
+      {
+        "order": 6,
+        "type": "PRE_SLEEP",
+        "icon_type": "moon",
+        "title": "구간 2: 수면 준비",
+        "description": "목적지 시간(JFK)은 오후 4시입니다. 충분한 수면을 위해 이 시점부터 수면을 준비합니다. 기내 조명을 최대한 어둡게 하고, 블루라이트를 차단하며, 따뜻한 차 한 잔으로 몸을 이완하세요.",
+        "start_time": "2025-12-26T04:00:00+00:00",
+        "end_time": "2025-12-26T05:00:00+00:00",
+        "display_time": "04:00 - 05:00"
+      },
+      {
+        "order": 7,
+        "type": "SLEEP",
+        "icon_type": "moon",
+        "title": "구간 2: 수면 시간",
+        "description": "목적지 시간(JFK)은 오후 5시부터 밤 12시까지입니다. 최소 7시간의 숙면을 통해 시차 적응을 돕고 도착 후 컨디션을 관리하세요. 수면 중에는 빛 노출을 완전히 차단하세요.",
+        "start_time": "2025-12-26T05:00:00+00:00",
+        "end_time": "2025-12-26T12:00:00+00:00",
+        "display_time": "05:00 - 12:00"
+      },
+      {
+        "order": 8,
+        "type": "FREE_TIME",
+        "icon_type": "play",
+        "title": "구간 2: 기상 및 자유 시간",
+        "description": "기상 후 가볍게 스트레칭하며 활동을 시작하세요. 목적지 시간(JFK)은 자정입니다. 착륙 전까지는 늦은 밤에서 새벽이므로 빛 노출을 최대한 차단하여 생체시계가 혼란스럽지 않도록 합니다.",
+        "start_time": "2025-12-26T12:00:00+00:00",
+        "end_time": "2025-12-26T13:30:00+00:00",
+        "display_time": "12:00 - 13:30"
+      },
+      {
+        "order": 9,
+        "type": "MEAL",
+        "icon_type": "meal",
+        "title": "구간 2: 예상 식사 시간",
+        "description": "착륙 전 가벼운 식사 또는 간식이 제공됩니다. 목적지 시간(JFK)은 새벽 1시 30분입니다. 소량의 식사로 착륙 후 컨디션을 조절하고, 빛 노출을 계속 차단하세요.",
+        "start_time": "2025-12-26T13:30:00+00:00",
+        "end_time": "2025-12-26T14:00:00+00:00",
+        "display_time": "13:30 - 14:00"
+      },
+      {
+        "order": 10,
+        "type": "LANDING",
+        "icon_type": "airplane_landing",
+        "title": "구간 2: 착륙 및 안정 (JFK)",
+        "description": "착륙 준비. BIMO와 함께 스마트한 비행을 마무리합니다. 목적지 시간(JFK)은 새벽 3시 30분입니다. 도착 후 목적지 현지 시간의 햇빛 노출 스케줄에 맞춰 행동하여 시차 적응을 시작하세요.",
+        "start_time": "2025-12-26T14:00:00+00:00",
+        "end_time": "2025-12-26T14:30:00+00:00",
+        "display_time": "14:00 - 14:30"
+      }
+    ]
+  }
+}
