@@ -9,6 +9,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional
 
 from fastapi.concurrency import run_in_threadpool
+from google.cloud.firestore_v1.base_query import FieldFilter
 
 from app.core.firebase import FirebaseService
 from app.feature.airlines.models import Airline, AirlineDetail
@@ -271,8 +272,8 @@ class AirlineService:
 
             # 1) 해당 기간 리뷰 조회
             query = (
-                self.reviews_collection.where("createdAt", ">=", start_date)
-                .where("createdAt", "<", end_date)
+                self.reviews_collection.where(filter=FieldFilter("createdAt", ">=", start_date))
+                .where(filter=FieldFilter("createdAt", "<", end_date))
             )
             review_docs = await run_in_threadpool(lambda: list(query.stream()))
 

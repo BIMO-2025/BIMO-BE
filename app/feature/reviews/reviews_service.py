@@ -6,6 +6,7 @@ import json
 from typing import List, Optional, Tuple
 from datetime import datetime, timedelta, timezone
 from fastapi.concurrency import run_in_threadpool
+from google.cloud.firestore_v1.base_query import FieldFilter
 
 from app.core.firebase import FirebaseService
 from app.feature.llm.gemini_client import GeminiClient
@@ -53,7 +54,7 @@ class ReviewsService:
             리뷰 목록
         """
         try:
-            query = self.reviews_collection.where("airlineCode", "==", airline_code).limit(limit)
+            query = self.reviews_collection.where(filter=FieldFilter("airlineCode", "==", airline_code)).limit(limit)
             docs = await run_in_threadpool(lambda: list(query.stream()))
             
             reviews = []
@@ -427,7 +428,7 @@ class ReviewsService:
             airline_name = airline_data.get("airlineName", airline_code)
             
             # 2. 모든 리뷰 조회
-            query = self.reviews_collection.where("airlineCode", "==", airline_code)
+            query = self.reviews_collection.where(filter=FieldFilter("airlineCode", "==", airline_code))
             docs = await run_in_threadpool(lambda: list(query.stream()))
             
             # 3. ReviewSchema로 변환
@@ -524,7 +525,7 @@ class ReviewsService:
                 overall_rating = round(sum(avg_ratings.values()) / len(avg_ratings), 2)
             
             # 3. 모든 리뷰 조회
-            query = self.reviews_collection.where("airlineCode", "==", airline_code)
+            query = self.reviews_collection.where(filter=FieldFilter("airlineCode", "==", airline_code))
             docs = await run_in_threadpool(lambda: list(query.stream()))
             
             # 4. ReviewSchema로 변환
@@ -785,7 +786,7 @@ class ReviewsService:
         """
         try:
             # 해당 항공사의 모든 리뷰 조회
-            query = self.reviews_collection.where("airlineCode", "==", airline_code)
+            query = self.reviews_collection.where(filter=FieldFilter("airlineCode", "==", airline_code))
             docs = await run_in_threadpool(lambda: list(query.stream()))
             
             if not docs:
@@ -917,7 +918,7 @@ class ReviewsService:
         """
         try:
             # Firestore 쿼리: userId로만 필터링 (정렬 없이)
-            query = self.reviews_collection.where("userId", "==", user_id)
+            query = self.reviews_collection.where(filter=FieldFilter("userId", "==", user_id))
             
             # 모든 문서 조회
             docs = await run_in_threadpool(lambda: list(query.stream()))
@@ -972,7 +973,7 @@ class ReviewsService:
             리뷰 개수
         """
         try:
-            query = self.reviews_collection.where("userId", "==", user_id)
+            query = self.reviews_collection.where(filter=FieldFilter("userId", "==", user_id))
             docs = await run_in_threadpool(lambda: list(query.stream()))
             return len(docs)
         except Exception as e:

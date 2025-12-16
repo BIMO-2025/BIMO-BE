@@ -6,6 +6,7 @@
 from typing import List, Optional
 from datetime import datetime
 from fastapi.concurrency import run_in_threadpool
+from google.cloud.firestore_v1.base_query import FieldFilter
 
 from app.core.firebase import FirebaseService
 from app.feature.flights.flights_schemas import MyFlightSchema
@@ -94,7 +95,7 @@ class MyFlightsService:
             
             # 상태 필터 적용
             if status:
-                query = query.where("status", "==", status)
+                query = query.where(filter=FieldFilter("status", "==", status))
             
             # 제한 적용
             query = query.limit(limit)
