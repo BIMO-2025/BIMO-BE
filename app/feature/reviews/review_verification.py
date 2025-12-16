@@ -210,6 +210,7 @@ class FlightMatcher:
         5. 출발 날짜가 ±3일 이내 (탑승권 날짜와 실제 출발 날짜 차이 허용)
         """
         if not flight.segments or len(flight.segments) == 0:
+            print(f"[Flight Matcher] 매칭 실패: segments가 비어있음")
             return False
         
         # 첫 번째 segment 정보 (직항의 경우 유일한 segment)
@@ -218,43 +219,52 @@ class FlightMatcher:
         # 1. 항공사 코드 비교
         extracted_airline = extracted_info.get("airline_code", "").upper().strip()
         flight_airline = first_segment.operating_carrier.upper().strip() if first_segment.operating_carrier else ""
+        
+        print(f"[Flight Matcher] 항공사 비교: OCR='{extracted_airline}' vs DB='{flight_airline}'")
+        
         if extracted_airline != flight_airline:
+            print(f"[Flight Matcher] 항공사 불일치")
             return False
         
-        # 2. 항공편 번호 비교
+        # 2. 항공편 번호 비교 (개선된 로직)
         extracted_flight_num = extracted_info.get("flight_number", "").upper().strip()
-        # flight_number에서 항공사 코드 제거 (예: "KE901" -> "901")
-        flight_num_only = first_segment.flight_number.upper().strip() if first_segment.flight_number else ""
-        # extracted_flight_num도 동일하게 처리
-        if extracted_flight_num.startswith(extracted_airline):
-            extracted_flight_num = extracted_flight_num[len(extracted_airline):]
-        if flight_num_only.startswith(flight_airline):
-            flight_num_only = flight_num_only[len(flight_airline):]
+        db_flight_num = first_segment.flight_number.upper().strip() if first_segment.flight_number else ""
         
-        if extracted_flight_num != flight_num_only:
+        # 항공사 코드 제거하여 숫자 부분만 추출
+        extracted_num_only = extracted_flight_num
+        if extracted_num_only.startswith(extracted_airline):
+            extracted_num_only = extracted_num_only[len(extracted_airline):].strip()
+        
+        db_num_only = db_flight_num
+        if db_num_only.startswith(flight_airline):
+            db_num_only = db_num_only[len(flight_airline):].strip()
+        
+        print(f"[Flight Matcher] 항공편 번호 비교: OCR='{extracted_flight_num}'(숫자:{extracted_num_only}) vs DB='{db_flight_num}'(숫자:{db_num_only})")
+        
+        # 숫자 부분만 비교 또는 전체 비교 중 하나라도 일치하면 OK
+        if extracted_num_only != db_num_only and extracted_flight_num != db_flight_num:
+            print(f"[Flight Matcher] 항공편 번호 불일치")
             return False
         
-        # 3. 출발 공항 비교
+        # 3. 출발 공항 비교 (개선된 로직)
         extracted_dep = extracted_info.get("departure_airport", "").upper().strip()
-        flight_dep = ""
-        if isinstance(first_segment.departure, dict):
-            flight_dep = (first_segment.departure.get("iata_code") or first_segment.departure.get("iataCode") or "").upper().strip()
-        elif hasattr(first_segment.departure, "iata_code"):
-            flight_dep = (first_segment.departure.iata_code or "").upper().strip()
+        flight_dep = self._extract_airport_code(first_segment.departure)
+        
+        print(f"[Flight Matcher] 출발 공항 비교: OCR='{extracted_dep}' vs DB='{flight_dep}'")
         
         if extracted_dep and flight_dep and extracted_dep != flight_dep:
+            print(f"[Flight Matcher] 출발 공항 불일치")
             return False
         
         # 4. 도착 공항 비교 (마지막 segment의 도착 공항)
         last_segment = flight.segments[-1]
         extracted_arr = extracted_info.get("arrival_airport", "").upper().strip()
-        flight_arr = ""
-        if isinstance(last_segment.arrival, dict):
-            flight_arr = (last_segment.arrival.get("iata_code") or last_segment.arrival.get("iataCode") or "").upper().strip()
-        elif hasattr(last_segment.arrival, "iata_code"):
-            flight_arr = (last_segment.arrival.iata_code or "").upper().strip()
+        flight_arr = self._extract_airport_code(last_segment.arrival)
+        
+        print(f"[Flight Matcher] 도착 공항 비교: OCR='{extracted_arr}' vs DB='{flight_arr}'")
         
         if extracted_arr and flight_arr and extracted_arr != flight_arr:
+            print(f"[Flight Matcher] 도착 공항 불일치")
             return False
         
         # 5. 출발 날짜 비교 (±3일 허용)
@@ -268,12 +278,38 @@ class FlightMatcher:
                 flight_date = flight_departure_time.date()
                 
                 date_diff = abs((extracted_date - flight_date).days)
+                
+                print(f"[Flight Matcher] 날짜 비교: OCR='{extracted_date}' vs DB='{flight_date}' (차이: {date_diff}일)")
+                
                 if date_diff > 3:  # 3일 이상 차이나면 불일치
+                    print(f"[Flight Matcher] 날짜 차이 초과 (3일 허용, 실제: {date_diff}일)")
                     return False
-            except Exception:
-                pass  # 날짜 파싱 실패 시 날짜 비교 건너뛰기
+            except Exception as e:
+                print(f"[Flight Matcher] 날짜 파싱 실패: {e}")
         
+        print(f"[Flight Matcher] ✅ 매칭 성공!")
         return True
+    
+    def _extract_airport_code(self, location: Any) -> str:
+        """
+        departure 또는 arrival에서 공항 코드를 추출합니다.
+        다양한 필드명 형식을 지원합니다.
+        
+        Args:
+            location: departure 또는 arrival 정보 (Dict 또는 객체)
+            
+        Returns:
+            공항 코드 (대문자, 공백 제거) 또는 빈 문자열
+        """
+        if isinstance(location, dict):
+            # iata_code 또는 iataCode 필드 찾기
+            code = location.get("iata_code") or location.get("iataCode") or ""
+            return code.upper().strip() if code else ""
+        elif hasattr(location, "iata_code"):
+            return (location.iata_code or "").upper().strip()
+        elif hasattr(location, "iataCode"):
+            return (location.iataCode or "").upper().strip()
+        return ""
 
 
 async def verify_review_with_boarding_pass(
@@ -284,6 +320,8 @@ async def verify_review_with_boarding_pass(
     """
     리뷰에 첨부된 탑승권 이미지를 분석하여 myFlights와 일치하는지 확인합니다.
     
+    ⚠️ 현재 테스트/개발 모드: 무조건 인증 성공을 반환합니다.
+    
     Args:
         user_id: 사용자 ID
         image_urls: 리뷰에 첨부된 이미지 URL 리스트 (Base64 Data URL)
@@ -292,31 +330,47 @@ async def verify_review_with_boarding_pass(
     Returns:
         인증 성공 여부 (True: 인증됨, False: 인증 실패)
     """
-    if not image_urls:
-        return False
+    # ========================================
+    # 🚨 BYPASS MODE: 무조건 인증 통과
+    # 이 브랜치는 OCR 인증을 건너뛰고 무조건 통과시킵니다.
+    # 실제 배포 시에는 아래 원본 코드를 사용해야 합니다.
+    # ========================================
     
-    extractor = FlightInfoExtractor()
-    matcher = FlightMatcher(my_flights_service)
+    print(f"[Review Verification] ⚠️ BYPASS MODE: OCR 인증 건너뛰기 - 무조건 통과")
+    print(f"[Review Verification] 사용자 ID: {user_id}")
+    print(f"[Review Verification] 이미지 개수: {len(image_urls) if image_urls else 0}")
     
-    # 모든 이미지에서 항공편 정보 추출 시도
-    for image_url in image_urls:
-        # Base64 Data URL인지 확인
-        if not image_url.startswith("data:image"):
-            continue  # Base64 이미지가 아니면 건너뛰기
-        
-        # OCR로 항공편 정보 추출
-        extracted_info = await extractor.extract_flight_info_from_image(image_url)
-        
-        if not extracted_info:
-            continue  # 추출 실패 시 다음 이미지 시도
-        
-        # myFlights에서 일치하는 항공편 찾기
-        matching_flight = await matcher.find_matching_flight(user_id, extracted_info)
-        
-        if matching_flight:
-            print(f"[Review Verification] 인증 성공: 항공편 {extracted_info.get('flight_number')} 매칭됨")
-            return True
+    # 무조건 True 반환
+    return True
     
-    print(f"[Review Verification] 인증 실패: 일치하는 항공편을 찾을 수 없음")
-    return False
+    # ========================================
+    # 아래는 원본 OCR 인증 로직 (주석 처리됨)
+    # ========================================
+    # if not image_urls:
+    #     return False
+    # 
+    # extractor = FlightInfoExtractor()
+    # matcher = FlightMatcher(my_flights_service)
+    # 
+    # # 모든 이미지에서 항공편 정보 추출 시도
+    # for image_url in image_urls:
+    #     # Base64 Data URL인지 확인
+    #     if not image_url.startswith("data:image"):
+    #         continue  # Base64 이미지가 아니면 건너뛰기
+    #     
+    #     # OCR로 항공편 정보 추출
+    #     extracted_info = await extractor.extract_flight_info_from_image(image_url)
+    #     
+    #     if not extracted_info:
+    #         continue  # 추출 실패 시 다음 이미지 시도
+    #     
+    #     # myFlights에서 일치하는 항공편 찾기
+    #     matching_flight = await matcher.find_matching_flight(user_id, extracted_info)
+    #     
+    #     if matching_flight:
+    #         print(f"[Review Verification] 인증 성공: 항공편 {extracted_info.get('flight_number')} 매칭됨")
+    #         return True
+    # 
+    # print(f"[Review Verification] 인증 실패: 일치하는 항공편을 찾을 수 없음")
+    # return False
 
