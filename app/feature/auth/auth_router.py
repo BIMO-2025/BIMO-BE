@@ -3,8 +3,10 @@
 각 소셜 로그인 프로바이더별 엔드포인트를 제공합니다.
 """
 
-from fastapi import APIRouter
-from app.feature.auth import auth_schemas, auth_service
+from fastapi import APIRouter, Depends
+from app.feature.auth import auth_schemas
+from app.feature.auth.auth_service import AuthService
+from app.core.deps import get_auth_service
 
 router = APIRouter(
     prefix="/auth",
@@ -24,17 +26,11 @@ async def logout():
     return {"message": "성공적으로 로그아웃되었습니다."}
 
 
-async def _handle_social_login(
-    authenticate_func,
-    request: auth_schemas.SocialLoginRequest
-) -> auth_schemas.TokenResponse:
-    """소셜 로그인 공통 핸들러"""
-    result = await authenticate_func(request.token, fcm_token=request.fcm_token)
-    
-    # 사용자 정보 추출
+def _create_token_response(auth_result: dict) -> auth_schemas.TokenResponse:
+    """인증 결과를 TokenResponse 모델로 변환하는 헬퍼 함수"""
     user_info = None
-    if "user" in result and result["user"]:
-        user = result["user"]
+    if "user" in auth_result and auth_result["user"]:
+        user = auth_result["user"]
         user_info = auth_schemas.UserInfo(
             uid=user.uid,
             email=user.email,
@@ -44,64 +40,57 @@ async def _handle_social_login(
         )
     
     return auth_schemas.TokenResponse(
-        access_token=result["access_token"],
-        refresh_token=result["refresh_token"],
-        token_type=result["token_type"],
+        access_token=auth_result["access_token"],
+        refresh_token=auth_result.get("refresh_token"),
+        token_type=auth_result["token_type"],
         user=user_info
     )
 
 
 @router.post("/google/login", response_model=auth_schemas.TokenResponse)
-async def login_with_google(request: auth_schemas.SocialLoginRequest):
+async def login_with_google(
+    request: auth_schemas.SocialLoginRequest,
+    auth_service: AuthService = Depends(get_auth_service)
+):
     """
     Google 로그인 엔드포인트
     
     클라이언트로부터 받은 Google Firebase ID Token을 검증하고,
     API Access Token을 발급합니다.
     
-    - **token**: Google Firebase ID Token (클라이언트에서 Firebase SDK로 발급받은 토큰)
-    
-    Returns:
-        - **access_token**: 우리 서비스 전용 JWT 토큰
-        - **token_type**: "bearer"
+    - **token**: Google Firebase ID Token
     """
-    return await _handle_social_login(auth_service.authenticate_with_google, request)
+    result = await auth_service.authenticate_with_google(request.token, fcm_token=request.fcm_token)
+    return _create_token_response(result)
 
 
 @router.post("/apple/login", response_model=auth_schemas.TokenResponse)
-async def login_with_apple(request: auth_schemas.SocialLoginRequest):
+async def login_with_apple(
+    request: auth_schemas.SocialLoginRequest,
+    auth_service: AuthService = Depends(get_auth_service)
+):
     """
     Apple 로그인 엔드포인트
     
     클라이언트로부터 받은 Apple Firebase ID Token을 검증하고,
     API Access Token을 발급합니다.
     
-    - **token**: Apple Firebase ID Token (클라이언트에서 Firebase SDK로 발급받은 토큰)
-    
-    Returns:
-        - **access_token**: 우리 서비스 전용 JWT 토큰
-        - **token_type**: "bearer"
+    - **token**: Apple Firebase ID Token
     """
-    return await _handle_social_login(auth_service.authenticate_with_apple, request)
+    result = await auth_service.authenticate_with_apple(request.token, fcm_token=request.fcm_token)
+    return _create_token_response(result)
 
 
 @router.post("/kakao/login", response_model=auth_schemas.TokenResponse)
-async def login_with_kakao(request: auth_schemas.SocialLoginRequest):
+async def login_with_kakao(
+    request: auth_schemas.SocialLoginRequest,
+    auth_service: AuthService = Depends(get_auth_service)
+):
     """
     Kakao 로그인 엔드포인트
     
     클라이언트로부터 받은 Kakao Access Token과 사용자 정보를 받아,
     Firebase Auth 사용자를 생성/조회한 뒤 API Access Token을 발급합니다.
-    
-    - **token**: Kakao Access Token (Kakao SDK로 발급받은 토큰)
-    - **kakao_id**: 카카오 사용자 ID (선택사항, 클라이언트에서 카카오 SDK로 받은 정보)
-    - **email**: 카카오 계정 이메일 (선택사항)
-    - **display_name**: 카카오 닉네임 (선택사항)
-    - **photo_url**: 카카오 프로필 이미지 URL (선택사항)
-    
-    Returns:
-        - **access_token**: 우리 서비스 전용 JWT 토큰
-        - **token_type**: "bearer"
     """
     result = await auth_service.authenticate_with_kakao(
         token=request.token,
@@ -111,43 +100,17 @@ async def login_with_kakao(request: auth_schemas.SocialLoginRequest):
         display_name=request.display_name,
         photo_url=request.photo_url
     )
-    
-    # 사용자 정보 추출
-    user_info = None
-    if "user" in result and result["user"]:
-        user = result["user"]
-        user_info = auth_schemas.UserInfo(
-            uid=user.uid,
-            email=user.email,
-            display_name=user.display_name,
-            photo_url=user.photo_url,
-            provider_id=user.provider_id
-        )
-    
-    return auth_schemas.TokenResponse(
-        access_token=result["access_token"],
-        refresh_token=result["refresh_token"],
-        token_type=result["token_type"],
-        user=user_info
-    )
+    return _create_token_response(result)
 
 
 @router.post("/refresh", response_model=auth_schemas.AccessTokenResponse)
-async def refresh_token(request: auth_schemas.RefreshTokenRequest):
+async def refresh_token(
+    request: auth_schemas.RefreshTokenRequest,
+    auth_service: AuthService = Depends(get_auth_service)
+):
     """
     Access Token 갱신 엔드포인트
     
     Refresh Token을 검증하여 새로운 Access Token을 발급합니다.
-    
-    - **refresh_token**: 로그인 시 발급받은 Refresh Token
-    
-    Returns:
-        - **access_token**: 새로운 JWT Access Token (30분 유효)
-        - **token_type**: "bearer"
-        
-    Note:
-        - Refresh Token은 기본적으로 7일간 유효합니다.
-        - Access Token이 만료되면 이 엔드포인트를 호출하여 새 토큰을 받으세요.
-        - Refresh Token이 만료된 경우 재로그인이 필요합니다.
     """
     return await auth_service.refresh_access_token(request.refresh_token)

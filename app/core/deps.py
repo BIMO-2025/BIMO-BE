@@ -29,6 +29,7 @@ from app.feature.llm.gemini_client import GeminiClient
 from app.feature.llm.llm_service import LLMService
 from app.feature.wellness.wellness_service import WellnessService
 from app.feature.reviews.review_filter_service import ReviewFilterService
+from app.feature.auth.auth_service import AuthService
 from app.feature.reviews.review_summary_service import ReviewSummaryService
 
 
@@ -117,6 +118,14 @@ def get_review_summary_service() -> "ReviewSummaryService":
     """
     llm_service = get_llm_service()
     return ReviewSummaryService(llm_service=llm_service)
+
+
+def get_auth_service() -> "AuthService":
+    """
+    AuthService 반환
+    """
+    firebase_service = get_firebase_service()
+    return AuthService(firebase_service=firebase_service)
 
 
 # =============================================================================
