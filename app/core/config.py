@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     
     # Firebase 설정
     FIREBASE_SERVICE_ACCOUNT_KEY: Optional[str] = None
-    FIREBASE_NEW_SERVICE_ACCOUNT_KEY: Optional[str] = None  # 새 Firebase 프로젝트 마이그레이션용
+    # FIREBASE_NEW_SERVICE_ACCOUNT_KEY: Optional[str] = None  # 새 Firebase 프로젝트 마이그레이션용
 
     # API 자체 JWT 토큰 설정
     API_SECRET_KEY: str

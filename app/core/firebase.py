@@ -34,7 +34,7 @@ class FirebaseService:
         
         # 1. .env 설정 확인 (Fail Fast 1)
         # 새 프로젝트 키를 우선 사용, 없으면 기존 키 사용
-        service_key_path = settings.FIREBASE_NEW_SERVICE_ACCOUNT_KEY or settings.FIREBASE_SERVICE_ACCOUNT_KEY
+        service_key_path = settings.FIREBASE_SERVICE_ACCOUNT_KEY
         
         if not service_key_path:
             raise AppConfigError(
