@@ -191,6 +191,7 @@ cython_debug/
 
 #Firebase-adminsdk-fbsvc
 firebase_service_key.json
+firebase_service_key2.json
 
 # Ruff stuff:
 .ruff_cache/
