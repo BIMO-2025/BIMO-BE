@@ -4,6 +4,8 @@ Firebase Admin SDK 초기화 및 관리
 이 모듈은 Firebase Firestore와 Auth 클라이언트를 제공합니다.
 """
 
+import json
+import os
 import firebase_admin
 from firebase_admin import auth, credentials, firestore
 from typing import Optional
@@ -42,8 +44,23 @@ class FirebaseService:
             )
         
         try:
-            # 2. 서비스 키 파일 유효성 검사 (Fail Fast 2)
-            cred = credentials.Certificate(service_key_path)
+            # 2. 서비스 키 처리: 파일 경로 vs JSON 문자열 자동 감지
+            if service_key_path.strip().startswith('{'):
+                # JSON 문자열인 경우 (Render 환경 변수)
+                try:
+                    service_account_info = json.loads(service_key_path)
+                    cred = credentials.Certificate(service_account_info)
+                    print("[INFO] Firebase 서비스 키를 JSON 문자열로 로드했습니다.")
+                except json.JSONDecodeError as e:
+                    raise AppConfigError(f"Firebase 서비스 키 JSON 파싱 실패: {e}")
+            else:
+                # 파일 경로인 경우 (로컬 개발 환경)
+                if not os.path.exists(service_key_path):
+                    raise AppConfigError(
+                        f"Firebase 서비스 키 파일을 찾을 수 없습니다. 경로를 확인하세요: {service_key_path}"
+                    )
+                cred = credentials.Certificate(service_key_path)
+                print(f"[INFO] Firebase 서비스 키를 파일에서 로드했습니다: {service_key_path}")
             
             # 3. Firebase Admin SDK 초기화 (Fail Fast 3)
             # 이미 초기화된 경우 기존 앱 사용
@@ -65,12 +82,10 @@ class FirebaseService:
         
         except ValueError as e:
             # credentials.Certificate()가 실패한 경우
-            raise AppConfigError(f"Firebase 서비스 키 파일이 유효하지 않습니다: {e}")
-        except FileNotFoundError:
-            # 파일 경로가 잘못된 경우
-            raise AppConfigError(
-                f"Firebase 서비스 키 파일을 찾을 수 없습니다. 경로를 확인하세요: {service_key_path}"
-            )
+            raise AppConfigError(f"Firebase 서비스 키가 유효하지 않습니다: {e}")
+        except AppConfigError:
+            # 이미 AppConfigError로 래핑된 경우 그대로 전달
+            raise
         except Exception as e:
             # 기타 알 수 없는 오류
             raise AppConfigError(f"Firebase 초기화 중 알 수 없는 오류 발생: {e}")
