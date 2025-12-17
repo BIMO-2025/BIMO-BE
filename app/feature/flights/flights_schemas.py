@@ -451,6 +451,15 @@ class SegmentHasReviewStatusSchema(BaseModel):
     hasReview: bool = Field(False, description="해당 segment에 대한 리뷰 작성 여부")
 
 
+class UpdateReviewStatusRequest(BaseModel):
+    """
+    myFlights의 특정 segment에 대한 리뷰 상태 업데이트 요청
+    """
+    airlineCode: str = Field(..., description="항공사 코드 (예: KE)")
+    flightNumber: str = Field(..., description="항공편 번호 (예: KE0037, 0037, 37 등)")
+    hasReview: bool = Field(..., description="리뷰 작성 여부 (true/false)")
+
+
 class MyFlightSegmentsHasReviewItemSchema(BaseModel):
     """
     myFlights 문서(1개)에 대한 segment별 hasReview 결과
