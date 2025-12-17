@@ -6,7 +6,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, Body
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
-from app.feature.flights.flights_schemas import MyFlightSchema, MyFlightsSegmentsHasReviewResponse
+from app.feature.flights.flights_schemas import MyFlightSchema, MyFlightsSegmentsHasReviewResponse, UpdateReviewStatusRequest
 from app.feature.flights.my_flights_service import MyFlightsService
 from app.core.security import decode_access_token
 from app.core.deps import get_firebase_service
@@ -130,6 +130,34 @@ async def get_my_flights_segments_has_review(
     - 응답에는 `myFlights` 문서 ID가 포함됩니다.
     """
     return await service.get_segments_has_review(user_id=user_id, status=status, limit=limit)
+
+
+@router.put("/segments/review-status", response_model=dict)
+async def update_segment_review_status_api(
+    user_id: str,
+    request: UpdateReviewStatusRequest,
+    current_user_id: str = Depends(get_current_user_id),
+    service: MyFlightsService = Depends(get_my_flights_service)
+):
+    """
+    특정 항공편 segment의 hasReview 상태를 명시적으로 업데이트합니다.
+    Firestore에 저장된 포맷(snake_case, 0-padded 숫자 등)에 상관없이 매칭되도록 처리합니다.
+    
+    - **airlineCode**: 항공사 코드 (예: "KE")
+    - **flightNumber**: 편명 (예: "37", "0037", "KE0037" 모두 가능)
+    - **hasReview**: true(작성됨) 또는 false(삭제됨/미작성)
+    """
+    success = await service.update_segment_review_status(
+        user_id=user_id,
+        airline_code=request.airlineCode,
+        flight_number=request.flightNumber,
+        has_review=request.hasReview
+    )
+    
+    return {
+        "success": success,
+        "message": "리뷰 상태가 업데이트되었습니다." if success else "업데이트 실패"
+    }
 
 
 @router.get("/{flight_id}", response_model=MyFlightSchema)

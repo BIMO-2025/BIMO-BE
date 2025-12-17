@@ -232,7 +232,7 @@ class MyFlightsService:
         Args:
             user_id: 사용자 ID
             airline_code: 항공사 코드 (예: "KE")
-            flight_number: 항공편 번호 (예: "KE901", 선택사항)
+            flight_number: 항공편 번호 (예: "KE901", "0037", "37" 등)
             has_review: 리뷰 작성 여부 (True: 리뷰 작성됨, False: 리뷰 없음)
             
         Returns:
@@ -249,8 +249,14 @@ class MyFlightsService:
             
             # 매칭되는 segment 찾기 및 업데이트
             updated_count = 0
-            airline_code_upper = airline_code.upper()
-            flight_number_upper = flight_number.upper()
+            airline_code_upper = airline_code.upper().strip()
+            
+            # 입력된 편명에서 숫자만 추출 (예: "KE37" -> "37", "0037" -> "37")
+            target_flight_num_str = "".join(filter(str.isdigit, flight_number))
+            if target_flight_num_str:
+                target_flight_num = int(target_flight_num_str)
+            else:
+                target_flight_num = -1  # 숫자가 없는 경우
             
             for doc in docs:
                 flight_data = doc.to_dict()
@@ -259,30 +265,63 @@ class MyFlightsService:
                 # segments 배열에서 매칭되는 segment 찾기
                 updated = False
                 for i, segment in enumerate(segments):
-                    segment_carrier = segment.get("operating_carrier", "").upper()
-                    segment_flight = segment.get("flight_number", "").upper()
+                    # 1. 항공사 코드 확인 (snake_case 우선, camelCase 대비)
+                    seg_carrier = (
+                        segment.get("operating_carrier") or 
+                        segment.get("operatingCarrier") or 
+                        segment.get("carrier_code") or 
+                        segment.get("carrierCode") or 
+                        ""
+                    ).upper().strip()
+                    
+                    # 2. 편명 확인
+                    seg_flight_raw = (
+                        segment.get("flight_number") or 
+                        segment.get("flightNumber") or 
+                        segment.get("number") or 
+                        ""
+                    ).upper().strip()
+                    
+                    # 편명에서 숫자만 추출
+                    seg_flight_num_str = "".join(filter(str.isdigit, seg_flight_raw))
+                    seg_flight_num = int(seg_flight_num_str) if seg_flight_num_str else -2
+                    
+                    # 3. 매칭 로직
+                    is_carrier_match = (seg_carrier == airline_code_upper)
+                    is_flight_match = False
+                    
+                    # 편명 숫자가 있으면 숫자끼리 비교 (예: 37 == 0037)
+                    if target_flight_num > 0 and seg_flight_num > 0:
+                        is_flight_match = (target_flight_num == seg_flight_num)
+                    else:
+                        # 숫자가 없으면 전체 문자열 비교
+                        is_flight_match = (flight_number.upper().strip() == seg_flight_raw)
                     
                     # airlineCode와 flightNumber로 매칭
-                    if segment_carrier == airline_code_upper and segment_flight == flight_number_upper:
-                        segments[i]["hasReview"] = has_review
-                        updated = True
+                    if is_carrier_match and is_flight_match:
+                        # 현재 상태와 다를 때만 업데이트
+                        if segment.get("hasReview") != has_review:
+                            segments[i]["hasReview"] = has_review
+                            updated = True
                 
                 # 매칭되는 segment가 있으면 document 업데이트
                 if updated:
                     doc_ref = collection_ref.document(doc.id)
-                    segments_to_update = flight_data["segments"]
+                    # segments 전체를 업데이트
                     await run_in_threadpool(
                         doc_ref.update,
-                        {"segments": segments_to_update}
+                        {"segments": segments}
                     )
                     updated_count += 1
+            
+            print(f"[ReviewStatus] User {user_id}: Updated {updated_count} flights (Req: {airline_code}{flight_number} -> {has_review})")
             
             # 매칭되는 항공편이 없어도 에러 발생하지 않음 (silent fail)
             return True
             
         except Exception as e:
             # 에러가 발생해도 리뷰 생성/삭제는 성공한 것으로 간주
-            # 로깅은 나중에 추가 가능
+            print(f"[ReviewStatus] Error updating review status: {e}")
             return True
 
     async def get_segments_has_review(
@@ -295,7 +334,7 @@ class MyFlightsService:
         사용자의 myFlights를 조회하여 각 segment별 hasReview(true/false)를 반환합니다.
 
         - myFlights 문서에 저장된 segments[*].hasReview 값에 의존하여 그대로 반환합니다.
-          (즉, 별도의 reviews 컬렉션 조회/재계산을 하지 않습니다.)
+        - 다양한 필드명(snake_case, camelCase)을 모두 고려하여 안전하게 값을 추출합니다.
 
         Args:
             user_id: 사용자 ID
@@ -330,6 +369,7 @@ class MyFlightsService:
                 segments_out: List[Dict[str, Any]] = []
                 for seg in raw_segments:
                     seg = seg or {}
+                    # 항공사 코드 추출 (다양한 키 시도)
                     operating_carrier = (
                         seg.get("operating_carrier")
                         or seg.get("operatingCarrier")
@@ -337,12 +377,14 @@ class MyFlightsService:
                         or seg.get("carrierCode")
                         or ""
                     )
+                    # 편명 추출 (다양한 키 시도)
                     flight_number = (
                         seg.get("flight_number")
                         or seg.get("flightNumber")
                         or seg.get("number")
                         or ""
                     )
+                    # hasReview 값 추출 (기본값 False)
                     has_review = bool(seg.get("hasReview", False))
 
                     segments_out.append(
