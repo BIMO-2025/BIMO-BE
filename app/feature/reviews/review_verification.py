@@ -180,13 +180,40 @@ class FlightMatcher:
             일치하는 MyFlightSchema 또는 None
         """
         try:
-            # 사용자의 모든 myFlights 조회 (status 필터 제거)
+            print(f"[Review Verification] Firestore에서 사용자({user_id})의 항공편 정보 조회를 시작합니다.")
+            
+            # 사용자의 모든 myFlights 조회 (status 필터 제거, 정렬 제거하여 모든 문서 조회 시도)
             flights = await self.my_flights_service.get_flights(
                 user_id=user_id,
                 status=None,  # status 필터 제거: scheduled와 completed 모두 조회
-                limit=50  # 최근 50개만 확인
+                limit=100,  # 더 많은 데이터를 가져오도록 증가
+                sort_by_date=False  # departureTime 필드가 없는 문서도 조회되도록 정렬 해제
             )
             
+            print(f"[Review Verification] Firestore 조회 완료: 총 {len(flights)}개의 항공편을 찾았습니다.")
+            
+            # 조회된 데이터 디버깅
+            for i, flight in enumerate(flights):
+                try:
+                    # 주요 정보만 요약해서 출력
+                    first_seg = flight.segments[0] if flight.segments else None
+                    flight_num = first_seg.flight_number if first_seg else "N/A"
+                    airline = first_seg.operating_carrier if first_seg else "N/A"
+                    dep_time = flight.departureTime
+                    
+                    # 공항 코드 추출
+                    dep_code = "N/A"
+                    arr_code = "N/A"
+                    if first_seg:
+                        dep_code = self._extract_airport_code(first_seg.departure)
+                        arr_code = self._extract_airport_code(first_seg.arrival)
+                    
+                    print(f"  [{i+1}] Flight: {airline}{flight_num} | Date: {dep_time} | Route: {dep_code}->{arr_code}")
+                    # 전체 데이터 덤프가 필요하면 아래 주석 해제
+                    # print(f"  [{i+1}] Detail: {flight.model_dump_json()}")
+                except Exception as dbg_e:
+                    print(f"  [{i+1}] 데이터 로깅 중 오류: {dbg_e}")
+
             # 각 항공편과 비교
             for flight in flights:
                 if self._matches_flight(flight, extracted_info):
@@ -320,8 +347,6 @@ async def verify_review_with_boarding_pass(
     """
     리뷰에 첨부된 탑승권 이미지를 분석하여 myFlights와 일치하는지 확인합니다.
     
-    ⚠️ 현재 테스트/개발 모드: 무조건 인증 성공을 반환합니다.
-    
     Args:
         user_id: 사용자 ID
         image_urls: 리뷰에 첨부된 이미지 URL 리스트 (Base64 Data URL)
@@ -330,47 +355,31 @@ async def verify_review_with_boarding_pass(
     Returns:
         인증 성공 여부 (True: 인증됨, False: 인증 실패)
     """
-    # ========================================
-    # 🚨 BYPASS MODE: 무조건 인증 통과
-    # 이 브랜치는 OCR 인증을 건너뛰고 무조건 통과시킵니다.
-    # 실제 배포 시에는 아래 원본 코드를 사용해야 합니다.
-    # ========================================
+    if not image_urls:
+        return False
     
-    print(f"[Review Verification] ⚠️ BYPASS MODE: OCR 인증 건너뛰기 - 무조건 통과")
-    print(f"[Review Verification] 사용자 ID: {user_id}")
-    print(f"[Review Verification] 이미지 개수: {len(image_urls) if image_urls else 0}")
+    extractor = FlightInfoExtractor()
+    matcher = FlightMatcher(my_flights_service)
     
-    # 무조건 True 반환
-    return True
+    # 모든 이미지에서 항공편 정보 추출 시도
+    for image_url in image_urls:
+        # Base64 Data URL인지 확인
+        if not image_url.startswith("data:image"):
+            continue  # Base64 이미지가 아니면 건너뛰기
+        
+        # OCR로 항공편 정보 추출
+        extracted_info = await extractor.extract_flight_info_from_image(image_url)
+        
+        if not extracted_info:
+            continue  # 추출 실패 시 다음 이미지 시도
+        
+        # myFlights에서 일치하는 항공편 찾기
+        matching_flight = await matcher.find_matching_flight(user_id, extracted_info)
+        
+        if matching_flight:
+            print(f"[Review Verification] 인증 성공: 항공편 {extracted_info.get('flight_number')} 매칭됨")
+            return True
     
-    # ========================================
-    # 아래는 원본 OCR 인증 로직 (주석 처리됨)
-    # ========================================
-    # if not image_urls:
-    #     return False
-    # 
-    # extractor = FlightInfoExtractor()
-    # matcher = FlightMatcher(my_flights_service)
-    # 
-    # # 모든 이미지에서 항공편 정보 추출 시도
-    # for image_url in image_urls:
-    #     # Base64 Data URL인지 확인
-    #     if not image_url.startswith("data:image"):
-    #         continue  # Base64 이미지가 아니면 건너뛰기
-    #     
-    #     # OCR로 항공편 정보 추출
-    #     extracted_info = await extractor.extract_flight_info_from_image(image_url)
-    #     
-    #     if not extracted_info:
-    #         continue  # 추출 실패 시 다음 이미지 시도
-    #     
-    #     # myFlights에서 일치하는 항공편 찾기
-    #     matching_flight = await matcher.find_matching_flight(user_id, extracted_info)
-    #     
-    #     if matching_flight:
-    #         print(f"[Review Verification] 인증 성공: 항공편 {extracted_info.get('flight_number')} 매칭됨")
-    #         return True
-    # 
-    # print(f"[Review Verification] 인증 실패: 일치하는 항공편을 찾을 수 없음")
-    # return False
+    print(f"[Review Verification] 인증 실패: 일치하는 항공편을 찾을 수 없음")
+    return False
 
