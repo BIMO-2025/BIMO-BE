@@ -74,7 +74,8 @@ class MyFlightsService:
         self,
         user_id: str,
         status: Optional[str] = None,
-        limit: int = 20
+        limit: int = 20,
+        sort_by_date: bool = True,
     ) -> List[MyFlightSchema]:
         """
         사용자의 비행 기록 목록을 조회합니다.
@@ -83,15 +84,19 @@ class MyFlightsService:
             user_id: 사용자 ID
             status: 비행 상태 필터 ("scheduled" 또는 "completed")
             limit: 조회할 최대 개수
+            sort_by_date: 출발 시간 기준 정렬 여부 (기본값: True)
             
         Returns:
-            비행 기록 목록 (departureTime 내림차순 정렬)
+            비행 기록 목록 (sort_by_date=True인 경우 departureTime 내림차순 정렬)
         """
         try:
             collection_ref = self._get_collection(user_id)
             
             # 쿼리 생성
-            query = collection_ref.order_by("departureTime", direction="DESCENDING")
+            if sort_by_date:
+                query = collection_ref.order_by("departureTime", direction="DESCENDING")
+            else:
+                query = collection_ref
             
             # 상태 필터 적용
             if status:
